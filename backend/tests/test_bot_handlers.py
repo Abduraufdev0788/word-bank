@@ -10,12 +10,14 @@ from bot.handlers.review import (
     format_card_answer,
 )
 from bot.handlers.vocabulary import add_word_command, translate_command
-from bot.handlers.batches import batches_command
+from bot.handlers.batches import batches_command, handle_inspect_batch
 from bot.handlers.progress import progress_command
 from bot.handlers.settings import settings_command, handle_confirm_unlink
 from bot.handlers.quiz import start_quiz, handle_quiz_answer
 from bot.handlers.story import stories_command, handle_read_story
 from bot.handlers.text_message import handle_user_text_message
+from bot.handlers.weak import weak_words_command
+from bot.handlers.word_of_day import word_of_day_command, handle_add_word_callback
 
 
 @pytest.mark.asyncio
@@ -255,4 +257,160 @@ async def test_bot_text_message_single_word_prompt():
         text_out = mock_status_msg.edit_text.call_args[0][0]
         assert "ubiquitous" in text_out
         assert "hamma joyda hozir bo'lgan" in text_out
+
+
+@pytest.mark.asyncio
+async def test_bot_batches_and_inspect():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+
+    fake_batches = [
+        {
+            "id": "batch-111",
+            "batch_number": 1,
+            "title": "1-to'plam",
+            "word_count": 20,
+            "status": "learning",
+            "due_count": 5,
+        }
+    ]
+
+    with patch("bot.handlers.batches.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.batches.api_client.get_batches", new_callable=AsyncMock) as mock_b:
+        mock_sum.return_value = {"is_linked": True}
+        mock_b.return_value = fake_batches
+
+        await batches_command(update, context)
+        update.message.reply_text.assert_called_once()
+        text = update.message.reply_text.call_args[0][0]
+        assert "1-to'plam" in text
+        assert "20" in text
+
+    # Test inspect batch
+    cb_update = MagicMock()
+    cb_update.effective_user.id = 12345
+    cb_update.callback_query.data = "inspect_batch_batch-111"
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.message.reply_text = AsyncMock()
+
+    with patch("bot.handlers.batches.api_client.get_batch_words", new_callable=AsyncMock) as mock_bw:
+        mock_bw.return_value = [
+            {"english_word": "serendipity", "uzbek_translation": "tasodifiy baxt", "part_of_speech": "noun"}
+        ]
+        await handle_inspect_batch(cb_update, context)
+        cb_update.callback_query.message.reply_text.assert_called_once()
+        text_words = cb_update.callback_query.message.reply_text.call_args[0][0]
+        assert "serendipity" in text_words
+        assert "tasodifiy baxt" in text_words
+
+
+@pytest.mark.asyncio
+async def test_bot_weak_words_command():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {}
+
+    fake_weak = [
+        {
+            "id": "weak-word-1",
+            "english_word": "inevitable",
+            "uzbek_translation": "muqarrar",
+            "part_of_speech": "adjective",
+            "cefr_level": "B2",
+            "is_weak": True,
+        }
+    ]
+
+    with patch("bot.handlers.weak.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.weak.api_client.get_weak_words", new_callable=AsyncMock) as mock_ww:
+        mock_sum.return_value = {"is_linked": True}
+        mock_ww.return_value = fake_weak
+
+        await weak_words_command(update, context)
+        update.message.reply_text.assert_called_once()
+        text = update.message.reply_text.call_args[0][0]
+        assert "inevitable" in text
+        assert "Zaif So'zlar" in text
+
+
+@pytest.mark.asyncio
+async def test_bot_stories_command_and_read():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {}
+
+    fake_stories = [
+        {
+            "id": "story-101",
+            "title_en": "The Mountain Journey",
+            "title_uz": "Tog'dagi sayohat",
+            "content_en": "Once upon a time in a high mountain...",
+            "content_uz": "Qadim zamonda baland tog'da...",
+            "cefr_level": "B1",
+            "target_words": ["journey", "mountain"],
+        }
+    ]
+
+    with patch("bot.handlers.story.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.story.api_client.get_stories", new_callable=AsyncMock) as mock_st:
+        mock_sum.return_value = {"is_linked": True}
+        mock_st.return_value = fake_stories
+
+        await stories_command(update, context)
+        update.message.reply_text.assert_called_once()
+        text = update.message.reply_text.call_args[0][0]
+        assert "AI Mini Hikoyalar" in text
+
+    # Read story callback
+    cb_update = MagicMock()
+    cb_update.effective_user.id = 12345
+    cb_update.callback_query.data = "read_story_story-101"
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.message.reply_text = AsyncMock()
+
+    await handle_read_story(cb_update, context)
+    cb_update.callback_query.message.reply_text.assert_called_once()
+    read_text = cb_update.callback_query.message.reply_text.call_args[0][0]
+    assert "The Mountain Journey" in read_text
+    assert "Qadim zamonda" in read_text
+
+
+@pytest.mark.asyncio
+async def test_bot_word_of_the_day():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+
+    fake_wotd = {
+        "id": "wotd-1",
+        "english_word": "Grit",
+        "uzbek_translation": "Matonat",
+        "part_of_speech": "noun",
+        "cefr_level": "C1",
+        "phonetic": "/ɡrɪt/",
+        "examples": [{"sentence_en": "She showed true grit.", "sentence_uz": "U haqiqiy matonat ko'rsatdi."}],
+    }
+
+    with patch("bot.handlers.word_of_day.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.word_of_day.api_client.get_word_of_the_day", new_callable=AsyncMock) as mock_w:
+        mock_sum.return_value = {"is_linked": True}
+        mock_w.return_value = fake_wotd
+
+        await word_of_day_command(update, context)
+        update.message.reply_text.assert_called_once()
+        text = update.message.reply_text.call_args[0][0]
+        assert "Grit" in text
+        assert "Matonat" in text
+
 
