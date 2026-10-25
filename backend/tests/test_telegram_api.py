@@ -136,3 +136,98 @@ async def test_telegram_quick_add_and_review_flow(client: AsyncClient):
     # After unlink, user should show is_linked = False
     unlinked_summary = await client.get(f"/api/v1/telegram/user/{tg_user_id}")
     assert unlinked_summary.json()["is_linked"] is False
+
+
+@pytest.mark.asyncio
+async def test_telegram_quiz_weak_words_and_word_of_day(client: AsyncClient):
+    token = await create_user_and_token(client, "tg_quiz_tester@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    tg_user_id = 7788990011
+
+    # Link account
+    link_res = await client.post("/api/v1/telegram/link-token", headers=headers)
+    link_token = link_res.json()["link_token"]
+    await client.post(
+        "/api/v1/telegram/verify-link",
+        json={
+            "token": link_token,
+            "telegram_user_id": tg_user_id,
+            "telegram_chat_id": tg_user_id,
+            "username": "quiz_tg_user",
+        },
+    )
+
+    # 1. Add words
+    words_to_add = [
+        {"english_word": "Persevere", "uzbek_translation": "Sabot qilmoq"},
+        {"english_word": "Brilliant", "uzbek_translation": "Ajoyib"},
+        {"english_word": "Courage", "uzbek_translation": "Jasorat"},
+    ]
+    added_ids = []
+    for w in words_to_add:
+        res = await client.post(
+            f"/api/v1/telegram/vocabulary/quick-add/{tg_user_id}",
+            json={**w, "auto_enrich": False},
+        )
+        assert res.status_code == 201
+        added_ids.append(res.json()["id"])
+
+    # 2. Test Word of the Day
+    wotd_res = await client.get(f"/api/v1/telegram/word-of-the-day/{tg_user_id}")
+    assert wotd_res.status_code == 200
+    wotd_data = wotd_res.json()
+    assert "english_word" in wotd_data
+    assert "uzbek_translation" in wotd_data
+
+    # 3. Test Weak Words
+    weak_res = await client.get(f"/api/v1/telegram/weak-words/{tg_user_id}")
+    assert weak_res.status_code == 200
+    weak_data = weak_res.json()
+    assert len(weak_data) >= 1
+
+    # 4. Test Quiz generation
+    quiz_res = await client.get(f"/api/v1/telegram/quiz/{tg_user_id}?count=3&direction=en_to_uz")
+    assert quiz_res.status_code == 200
+    questions = quiz_res.json()
+    assert len(questions) >= 1
+    first_q = questions[0]
+    assert "prompt" in first_q
+    assert "options" in first_q
+    assert len(first_q["options"]) >= 2
+
+    # 5. Test Quiz Answer Submission (Correct)
+    ans_res = await client.post(
+        f"/api/v1/telegram/quiz/answer/{tg_user_id}",
+        json={
+            "word_id": added_ids[0],
+            "selected_option": "Sabot qilmoq",
+            "direction": "en_to_uz",
+        },
+    )
+    assert ans_res.status_code == 200
+    ans_data = ans_res.json()
+    assert ans_data["is_correct"] is True
+    assert "Sabot qilmoq" in ans_data["correct_answer"]
+
+    # 6. Test Quiz Answer Submission (Incorrect)
+    wrong_ans_res = await client.post(
+        f"/api/v1/telegram/quiz/answer/{tg_user_id}",
+        json={
+            "word_id": added_ids[1],
+            "selected_option": "Mutlaqo noto'g'ri so'z",
+            "direction": "en_to_uz",
+        },
+    )
+    assert wrong_ans_res.status_code == 200
+    wrong_ans_data = wrong_ans_res.json()
+    assert wrong_ans_data["is_correct"] is False
+    assert wrong_ans_data["correct_answer"] == "Ajoyib"
+
+    # 7. Test Batch words
+    batches = (await client.get(f"/api/v1/telegram/batches/{tg_user_id}")).json()
+    assert len(batches) >= 1
+    batch_id = batches[0]["id"]
+    batch_words_res = await client.get(f"/api/v1/telegram/batches/{tg_user_id}/{batch_id}/words")
+    assert batch_words_res.status_code == 200
+    assert len(batch_words_res.json()) >= 3
+

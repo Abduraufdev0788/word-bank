@@ -13,6 +13,9 @@ from bot.handlers.vocabulary import add_word_command, translate_command
 from bot.handlers.batches import batches_command
 from bot.handlers.progress import progress_command
 from bot.handlers.settings import settings_command, handle_confirm_unlink
+from bot.handlers.quiz import start_quiz, handle_quiz_answer
+from bot.handlers.story import stories_command, handle_read_story
+from bot.handlers.text_message import handle_user_text_message
 
 
 @pytest.mark.asyncio
@@ -173,3 +176,83 @@ async def test_bot_quick_add_word():
         mock_status_msg.edit_text.assert_called_once()
         saved_text = mock_status_msg.edit_text.call_args[0][0]
         assert "egilmas, chidamli" in saved_text
+
+
+@pytest.mark.asyncio
+async def test_bot_quiz_flow():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.args = []
+    context.user_data = {}
+
+    fake_questions = [
+        {
+            "word_id": "test-word-1",
+            "prompt": "Persistent",
+            "options": ["Tirishop", "Dangasa", "Qo'rqoq", "Shoshqaloq"],
+            "direction": "en_to_uz",
+        }
+    ]
+
+    with patch("bot.handlers.quiz.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.quiz.api_client.get_quiz_questions", new_callable=AsyncMock) as mock_q:
+        mock_sum.return_value = {"is_linked": True}
+        mock_q.return_value = fake_questions
+
+        await start_quiz(update, context)
+        update.message.reply_text.assert_called_once()
+        sent_text = update.message.reply_text.call_args[0][0]
+        assert "Persistent" in sent_text
+        assert context.user_data["quiz_index"] == 0
+
+    # Answer quiz question
+    cb_update = MagicMock()
+    cb_update.effective_user.id = 12345
+    cb_update.callback_query.data = "qans_test-word-1_0_en_to_uz"
+    cb_update.callback_query.answer = AsyncMock()
+    cb_update.callback_query.message.reply_text = AsyncMock()
+
+    with patch("bot.handlers.quiz.api_client.submit_quiz_answer", new_callable=AsyncMock) as mock_ans:
+        mock_ans.return_value = {
+            "is_correct": True,
+            "correct_answer": "Tirishqoq",
+            "explanation": "🇬🇧 Persistent = 🇺🇿 Tirishqoq",
+        }
+        await handle_quiz_answer(cb_update, context)
+        mock_ans.assert_called_once_with(
+            telegram_user_id=12345,
+            word_id="test-word-1",
+            selected_option="Tirishop",
+            direction="en_to_uz",
+        )
+        assert cb_update.callback_query.message.reply_text.call_count == 2
+        final_summary = cb_update.callback_query.message.reply_text.call_args[0][0]
+        assert "Viktorina yakunlandi" in final_summary
+
+
+@pytest.mark.asyncio
+async def test_bot_text_message_single_word_prompt():
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.text = "ubiquitous"
+    mock_status_msg = MagicMock()
+    mock_status_msg.edit_text = AsyncMock()
+    update.message.reply_text = AsyncMock(return_value=mock_status_msg)
+
+    context = MagicMock()
+
+    with patch("bot.handlers.text_message.api_client.get_user_summary", new_callable=AsyncMock) as mock_sum, \
+         patch("bot.handlers.text_message.api_client.quick_translate", new_callable=AsyncMock) as mock_tr:
+        mock_sum.return_value = {"is_linked": True}
+        mock_tr.return_value = "hamma joyda hozir bo'lgan"
+
+        await handle_user_text_message(update, context)
+
+        mock_status_msg.edit_text.assert_called_once()
+        text_out = mock_status_msg.edit_text.call_args[0][0]
+        assert "ubiquitous" in text_out
+        assert "hamma joyda hozir bo'lgan" in text_out
+

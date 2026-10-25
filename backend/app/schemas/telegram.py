@@ -76,3 +76,18 @@ class TelegramReviewResultOut(BaseModel):
     is_mastered: bool
     is_weak: bool
 
+
+class TelegramQuizAnswerIn(BaseModel):
+    word_id: uuid.UUID
+    selected_option: str
+    direction: str = "en_to_uz"
+
+
+class TelegramQuizAnswerOut(BaseModel):
+    is_correct: bool
+    correct_answer: str
+    explanation: str
+    repetition_number: int = 0
+    streak_days: int = 1
+
+

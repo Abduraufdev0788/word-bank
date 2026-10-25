@@ -1,3 +1,4 @@
+from typing import List, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
@@ -10,11 +11,19 @@ def main_menu_keyboard(is_linked: bool = True) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🔄 Kunlik Takrorlash", callback_data="cmd_review"),
-            InlineKeyboardButton("➕ So'z qo'shish", callback_data="cmd_add"),
+            InlineKeyboardButton("🔄 Kunlik Takrorlash (SRS)", callback_data="cmd_review"),
+            InlineKeyboardButton("🎯 Viktorina (Quiz)", callback_data="cmd_quiz"),
         ],
         [
-            InlineKeyboardButton("📦 To'plamlarim", callback_data="cmd_batches"),
+            InlineKeyboardButton("➕ Yangi so'z", callback_data="cmd_add"),
+            InlineKeyboardButton("📦 To'plamlarim (20)", callback_data="cmd_batches"),
+        ],
+        [
+            InlineKeyboardButton("⚠️ Zaif So'zlar", callback_data="cmd_weak"),
+            InlineKeyboardButton("📖 Mini Hikoyalar", callback_data="cmd_stories"),
+        ],
+        [
+            InlineKeyboardButton("🌟 Kun so'zi", callback_data="cmd_word_of_day"),
             InlineKeyboardButton("📊 Natijalarim", callback_data="cmd_progress"),
         ],
         [
@@ -39,6 +48,71 @@ def flashcard_rating_keyboard(word_id: str) -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🟢 Yaxshi (4)", callback_data=f"rate_{word_id}_4"),
             InlineKeyboardButton("🌟 Oson (5)", callback_data=f"rate_{word_id}_5"),
+        ],
+    ])
+
+
+def quiz_options_keyboard(word_id: str, options: List[str], direction: str) -> InlineKeyboardMarkup:
+    keyboard = []
+    # 2x2 grid of options
+    row = []
+    for idx, opt in enumerate(options):
+        # Truncate text if too long
+        btn_text = opt if len(opt) <= 24 else opt[:22] + ".."
+        row.append(
+            InlineKeyboardButton(
+                btn_text,
+                callback_data=f"qans_{word_id}_{idx}_{direction}",
+            )
+        )
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+
+    keyboard.append([
+        InlineKeyboardButton("❌ Viktorinani tugatish", callback_data="cmd_menu")
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def word_of_day_keyboard(english_word: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("➕ Lug'atga qo'shish", callback_data=f"add_word_{english_word}"),
+            InlineKeyboardButton("🔄 Boshqa so'z", callback_data="cmd_word_of_day"),
+        ],
+        [
+            InlineKeyboardButton("🏠 Bosh menyu", callback_data="cmd_menu"),
+        ],
+    ])
+
+
+def stories_list_keyboard(stories: List[Dict[str, Any]]) -> InlineKeyboardMarkup:
+    buttons = []
+    for s in stories[:5]:
+        title = s.get("title_uz") or s.get("title_en") or "Hikoya"
+        level = s.get("cefr_level", "B1")
+        story_id = s.get("id")
+        buttons.append([
+            InlineKeyboardButton(f"📖 [{level}] {title[:28]}", callback_data=f"read_story_{story_id}")
+        ])
+
+    buttons.append([
+        InlineKeyboardButton("🏠 Bosh menyu", callback_data="cmd_menu")
+    ])
+    return InlineKeyboardMarkup(buttons)
+
+
+def batch_item_keyboard(batch_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👁 So'zlarni ko'rish", callback_data=f"inspect_batch_{batch_id}"),
+            InlineKeyboardButton("🔄 Takrorlash", callback_data="cmd_review"),
+        ],
+        [
+            InlineKeyboardButton("🔙 To'plamlar ro'yxati", callback_data="cmd_batches"),
         ],
     ])
 

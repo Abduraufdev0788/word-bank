@@ -156,5 +156,54 @@ class BackendAPIClient:
         except Exception:
             return None
 
+    # --- Weak Words & Word of the Day ---
+
+    async def get_weak_words(self, telegram_user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        res = await self._request("GET", f"/telegram/weak-words/{telegram_user_id}", params={"limit": limit})
+        return res if isinstance(res, list) else []
+
+    async def get_word_of_the_day(self, telegram_user_id: int) -> Optional[Dict[str, Any]]:
+        return await self._request("GET", f"/telegram/word-of-the-day/{telegram_user_id}")
+
+    # --- Interactive Quizzes ---
+
+    async def get_quiz_questions(
+        self,
+        telegram_user_id: int,
+        count: int = 5,
+        direction: str = "en_to_uz",
+    ) -> List[Dict[str, Any]]:
+        res = await self._request(
+            "GET",
+            f"/telegram/quiz/{telegram_user_id}",
+            params={"count": count, "direction": direction},
+        )
+        return res if isinstance(res, list) else []
+
+    async def submit_quiz_answer(
+        self,
+        telegram_user_id: int,
+        word_id: str,
+        selected_option: str,
+        direction: str = "en_to_uz",
+    ) -> Optional[Dict[str, Any]]:
+        payload = {
+            "word_id": word_id,
+            "selected_option": selected_option,
+            "direction": direction,
+        }
+        return await self._request("POST", f"/telegram/quiz/answer/{telegram_user_id}", json=payload)
+
+    # --- Mini Stories & Batch Words ---
+
+    async def get_stories(self, telegram_user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+        res = await self._request("GET", f"/telegram/stories/{telegram_user_id}", params={"limit": limit})
+        return res if isinstance(res, list) else []
+
+    async def get_batch_words(self, telegram_user_id: int, batch_id: str) -> List[Dict[str, Any]]:
+        res = await self._request("GET", f"/telegram/batches/{telegram_user_id}/{batch_id}/words")
+        return res if isinstance(res, list) else []
+
 
 api_client = BackendAPIClient()
+

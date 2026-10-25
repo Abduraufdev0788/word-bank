@@ -7,12 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+import random
 from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, TelegramAccount, AccountLinkToken
 from app.models.vocabulary import WordBatch, Word, WordProgress, WordExample
 from app.models.learning import DailyActivity, WordReview
+from app.models.story import MiniStory
 from app.schemas.telegram import (
     CreateLinkTokenOut,
     VerifyLinkIn,
@@ -22,6 +24,8 @@ from app.schemas.telegram import (
     TelegramQuickAddIn,
     TelegramReviewItemOut,
     TelegramReviewResultOut,
+    TelegramQuizAnswerIn,
+    TelegramQuizAnswerOut,
 )
 from app.schemas.vocabulary import WordBatchOut, WordOut
 from app.services.batch_service import get_or_create_destination_batch, recalculate_batch_status
@@ -522,3 +526,339 @@ async def unlink_telegram_account(
     await db.delete(tg_acc)
     await db.commit()
     return {"success": True, "message": "Telegram hisobi muvaffaqiyatli uzildi."}
+
+
+# --- 8. Weak Words Review ---
+
+@router.get(
+    "/weak-words/{telegram_user_id}",
+    summary="Telegram foydalanuvchisi uchun zaif so'zlar",
+)
+async def get_telegram_weak_words(
+    telegram_user_id: int,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = (
+        select(Word)
+        .join(WordProgress, Word.id == WordProgress.word_id)
+        .options(selectinload(Word.progress), selectinload(Word.examples))
+        .where(
+            Word.user_id == user.id,
+            (WordProgress.is_weak == True) | (WordProgress.ease_factor < 2.2),
+        )
+        .order_by(WordProgress.ease_factor.asc(), WordProgress.times_incorrect.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    words = result.scalars().all()
+
+    # If no explicitly weak words, fetch words with lowest repetition number
+    if not words:
+        fallback_stmt = (
+            select(Word)
+            .options(selectinload(Word.progress), selectinload(Word.examples))
+            .where(Word.user_id == user.id)
+            .order_by(Word.created_at.desc())
+            .limit(limit)
+        )
+        res_fb = await db.execute(fallback_stmt)
+        words = res_fb.scalars().all()
+
+    return [
+        {
+            "id": str(w.id),
+            "english_word": w.english_word,
+            "uzbek_translation": w.uzbek_translation,
+            "part_of_speech": w.part_of_speech,
+            "phonetic": w.phonetic,
+            "cefr_level": w.cefr_level,
+            "notes": w.notes,
+            "is_weak": w.progress.is_weak if w.progress else False,
+            "ease_factor": round(w.progress.ease_factor, 2) if w.progress else 2.5,
+        }
+        for w in words
+    ]
+
+
+# --- 9. Word of the Day ---
+
+@router.get(
+    "/word-of-the-day/{telegram_user_id}",
+    summary="Telegram foydalanuvchisi uchun kun so'zi",
+)
+async def get_word_of_the_day(
+    telegram_user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = (
+        select(Word)
+        .options(selectinload(Word.examples))
+        .where(Word.user_id == user.id)
+        .order_by(func.random())
+        .limit(1)
+    )
+    res = await db.execute(stmt)
+    w = res.scalars().first()
+    if w:
+        return {
+            "id": str(w.id),
+            "english_word": w.english_word,
+            "uzbek_translation": w.uzbek_translation,
+            "part_of_speech": w.part_of_speech,
+            "phonetic": w.phonetic,
+            "cefr_level": w.cefr_level,
+            "notes": w.notes,
+            "examples": [
+                {"sentence_en": ex.sentence_en, "sentence_uz": ex.sentence_uz}
+                for ex in w.examples
+            ],
+        }
+
+    return {
+        "id": None,
+        "english_word": "Perseverance",
+        "uzbek_translation": "Matonat, sabot, qat'iyat",
+        "part_of_speech": "noun",
+        "phonetic": "/ˌpɜː.sɪˈvɪə.rəns/",
+        "cefr_level": "B2",
+        "notes": "Muvaffaqiyatga erishishda to'siqlarga qaramay intilish",
+        "examples": [
+            {
+                "sentence_en": "Through perseverance and hard work, he achieved his goals.",
+                "sentence_uz": "Matonat va tinimsiz mehnat orqali u o'z maqsadlariga erishdi.",
+            }
+        ],
+    }
+
+
+# --- 10. Interactive Multiple-Choice Quiz ---
+
+@router.get(
+    "/quiz/{telegram_user_id}",
+    summary="Telegram orqali interaktiv viktorina savollarini olish",
+)
+async def get_telegram_quiz(
+    telegram_user_id: int,
+    count: int = 5,
+    direction: str = "en_to_uz",
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = (
+        select(Word)
+        .where(Word.user_id == user.id)
+        .order_by(func.random())
+        .limit(max(count, 10))
+    )
+    res = await db.execute(stmt)
+    all_words = res.scalars().all()
+
+    if not all_words:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Viktorina uchun lug'atingizda so'zlar topilmadi. Avval so'z qo'shing: /add",
+        )
+
+    quiz_words = all_words[:count]
+    questions = []
+
+    # Common Uzbek distractor fallback pool
+    common_distractors_uz = [
+        "muvaffaqiyat", "intilish", "qat'iyat", "sodiqlik", "tajriba",
+        "rivojlanish", "ishonch", "kelajak", "natija", "xavfsizlik"
+    ]
+    common_distractors_en = [
+        "achievement", "determination", "experience", "development",
+        "confidence", "progress", "opportunity", "knowledge"
+    ]
+
+    for w in quiz_words:
+        if direction == "en_to_uz":
+            correct_opt = w.uzbek_translation
+            prompt = w.english_word
+            other_opts = [
+                ow.uzbek_translation
+                for ow in all_words
+                if ow.id != w.id and ow.uzbek_translation != correct_opt
+            ]
+            if len(other_opts) < 3:
+                other_opts += [d for d in common_distractors_uz if d != correct_opt]
+        else:
+            correct_opt = w.english_word
+            prompt = w.uzbek_translation
+            other_opts = [
+                ow.english_word
+                for ow in all_words
+                if ow.id != w.id and ow.english_word != correct_opt
+            ]
+            if len(other_opts) < 3:
+                other_opts += [d for d in common_distractors_en if d != correct_opt]
+
+        chosen_distractors = random.sample(other_opts, min(3, len(other_opts)))
+        options = [correct_opt] + chosen_distractors
+        random.shuffle(options)
+
+        questions.append({
+            "word_id": str(w.id),
+            "prompt": prompt,
+            "direction": direction,
+            "options": options,
+        })
+
+    return questions
+
+
+@router.post(
+    "/quiz/answer/{telegram_user_id}",
+    response_model=TelegramQuizAnswerOut,
+    summary="Viktorina javobini tekshirish va SRS xotirasini yangilash",
+)
+async def check_telegram_quiz_answer(
+    telegram_user_id: int,
+    payload: TelegramQuizAnswerIn,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = select(Word).where(Word.id == payload.word_id, Word.user_id == user.id)
+    res = await db.execute(stmt)
+    word = res.scalars().first()
+    if not word:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="So'z topilmadi.",
+        )
+
+    direction = payload.direction
+    selected = payload.selected_option.strip().lower()
+
+    if direction == "en_to_uz":
+        expected = word.uzbek_translation.strip().lower()
+        is_correct = (selected == expected) or (expected in selected) or (selected in expected)
+        correct_answer = word.uzbek_translation
+    else:
+        expected = word.english_word.strip().lower()
+        is_correct = (selected == expected)
+        correct_answer = word.english_word
+
+    # SM-2 update: 5 if correct, 1 if wrong
+    quality = 5 if is_correct else 1
+    progress, review = await process_word_review(
+        user_id=user.id,
+        word_id=word.id,
+        quality_rating=quality,
+        review_source="telegram",
+        review_type="quiz",
+        db=db,
+        user_answer=payload.selected_option,
+        time_spent_ms=15000,
+    )
+
+    # Add 15s active study time
+    today = datetime.now(timezone.utc).date()
+    act_res = await db.execute(
+        select(DailyActivity).where(
+            DailyActivity.user_id == user.id,
+            DailyActivity.activity_date == today,
+        )
+    )
+    activity = act_res.scalars().first()
+    streak = 1
+    if not activity:
+        activity = DailyActivity(
+            user_id=user.id,
+            activity_date=today,
+            total_active_seconds=15,
+            words_reviewed=1,
+            streak_day_count=1,
+        )
+        db.add(activity)
+    else:
+        activity.words_reviewed += 1
+        activity.total_active_seconds += 15
+        streak = activity.streak_day_count
+
+    await db.commit()
+
+    explanation = f"🇬🇧 {word.english_word} = 🇺🇿 {word.uzbek_translation}"
+    if word.notes:
+        explanation += f"\n💡 {word.notes}"
+
+    return TelegramQuizAnswerOut(
+        is_correct=is_correct,
+        correct_answer=correct_answer,
+        explanation=explanation,
+        repetition_number=progress.repetition_number,
+        streak_days=streak,
+    )
+
+
+# --- 11. Mini Stories for Telegram ---
+
+@router.get(
+    "/stories/{telegram_user_id}",
+    summary="Telegram foydalanuvchisi uchun AI mini hikoyalari",
+)
+async def get_telegram_stories(
+    telegram_user_id: int,
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = (
+        select(MiniStory)
+        .where(MiniStory.user_id == user.id)
+        .order_by(MiniStory.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    stories = result.scalars().all()
+
+    return [
+        {
+            "id": str(s.id),
+            "title_en": s.title_en,
+            "title_uz": s.title_uz,
+            "cefr_level": s.cefr_level,
+            "content_en": s.content_en,
+            "content_uz": s.content_uz,
+            "target_words": s.target_words or [],
+            "created_at": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else None,
+        }
+        for s in stories
+    ]
+
+
+# --- 12. Batch Words Inspection ---
+
+@router.get(
+    "/batches/{telegram_user_id}/{batch_id}/words",
+    summary="To'plamdagi so'zlar ro'yxatini olish",
+)
+async def get_telegram_batch_words(
+    telegram_user_id: int,
+    batch_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    stmt = (
+        select(Word)
+        .where(Word.user_id == user.id, Word.batch_id == batch_id)
+        .order_by(Word.order_in_batch.asc())
+    )
+    result = await db.execute(stmt)
+    words = result.scalars().all()
+    return [
+        {
+            "id": str(w.id),
+            "english_word": w.english_word,
+            "uzbek_translation": w.uzbek_translation,
+            "part_of_speech": w.part_of_speech,
+            "phonetic": w.phonetic,
+            "cefr_level": w.cefr_level,
+        }
+        for w in words
+    ]
+
