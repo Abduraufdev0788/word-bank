@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smartvocab_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartvocab_db}
+      POSTGRES_USER: ${POSTGRES_USER:-smartvocab_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartvocab_secret_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartvocab_user} -d ${POSTGRES_DB:-smartvocab_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartvocab_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: smartvocab_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-smartvocab_user}:${POSTGRES_PASSWORD:-smartvocab_secret_pass}@db:5432/${POSTGRES_DB:-smartvocab_db}
+    networks:
+      - smartvocab_net
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: smartvocab_bot
+    restart: always
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      BACKEND_API_URL: http://backend:8000/api/v1
+    networks:
+      - smartvocab_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: smartvocab_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - smartvocab_net
+
+networks:
+  smartvocab_net:
+    driver: bridge
+
+volumes:
+  pgdata:
