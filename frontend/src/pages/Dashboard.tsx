@@ -31,6 +31,8 @@ interface DashboardProps {
   onNavigateToBatches: () => void;
   onNavigateToWeakWords: () => void;
   onNavigateToStories: () => void;
+  onNavigateToMasteredWords?: () => void;
+  onNavigateToWords?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -40,6 +42,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToBatches,
   onNavigateToWeakWords,
   onNavigateToStories,
+  onNavigateToMasteredWords,
+  onNavigateToWords,
 }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [levelAssessment, setLevelAssessment] = useState<LevelAssessment | null>(null);
@@ -272,7 +276,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* KPI Metrics Cards (4 Columns) with rich glowing gradients */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
         {/* Total Words Card */}
-        <div className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-brand-500/40 transition-all duration-300 shadow-lg group">
+        <div
+          onClick={onNavigateToWords}
+          className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-brand-500/50 transition-all duration-300 shadow-lg cursor-pointer group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2 sm:mb-3">
             <span className="text-[11px] sm:text-xs font-bold text-slate-300">Jami so'zlar</span>
             <div className="p-1.5 sm:p-2 rounded-xl bg-brand-500/15 border border-brand-500/30 text-brand-400 group-hover:scale-110 transition-transform">
@@ -280,13 +287,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-white tracking-tight">{stats.total_words}</p>
-          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1 truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" /> 20 talik to'plamlarda
+          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between truncate">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" /> 20 talik to'plamlarda
+            </span>
+            <span className="text-brand-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+              Bank <ChevronRight className="w-3 h-3" />
+            </span>
           </p>
         </div>
 
         {/* Mastered Words Card */}
-        <div className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-emerald-500/40 transition-all duration-300 shadow-lg group">
+        <div
+          onClick={onNavigateToMasteredWords}
+          className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-emerald-500/50 transition-all duration-300 shadow-lg cursor-pointer group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2 sm:mb-3">
             <span className="text-[11px] sm:text-xs font-bold text-slate-300">O'zlashtirilgan</span>
             <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 group-hover:scale-110 transition-transform">
@@ -295,9 +310,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <p className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">{stats.words_mastered}</p>
           <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>Aniqlik:</span>
-            <span className="px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
-              {stats.overall_accuracy_percent}%
+            <span>Aniqlik: {stats.overall_accuracy_percent}%</span>
+            <span className="text-emerald-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+              Ko'rish <ChevronRight className="w-3 h-3" />
             </span>
           </p>
         </div>

@@ -12,6 +12,8 @@ import {
   Layers,
   HelpCircle,
 } from 'lucide-react';
+import { api } from '../../api/client';
+import { useStudyTime } from '../../context/StudyTimeContext';
 
 interface BatchStudyModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const BatchStudyModal: React.FC<BatchStudyModalProps> = ({
   title,
   words,
 }) => {
+  const { startSession, endSession } = useStudyTime();
   const [phase, setPhase] = useState<StudyPhase>('flashcard');
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -48,6 +51,18 @@ export const BatchStudyModal: React.FC<BatchStudyModalProps> = ({
   const [inputShaking, setInputShaking] = useState(false);
   const [testMistakes, setTestMistakes] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-start active study time tracking when batch modal is active
+  useEffect(() => {
+    if (isOpen) {
+      startSession(phase === 'test' ? 'batch_written_test' : 'batch_flashcard');
+    }
+    return () => {
+      if (isOpen) {
+        endSession();
+      }
+    };
+  }, [isOpen, phase]);
 
   // Reset when modal opens or words change
   useEffect(() => {
@@ -115,6 +130,13 @@ export const BatchStudyModal: React.FC<BatchStudyModalProps> = ({
 
   const handleMarkLearned = () => {
     setLearnedIndices((prev) => new Set(prev).add(currentIndex));
+    if (currentWord?.id) {
+      api.submitReview({
+        word_id: currentWord.id,
+        quality_rating: 4,
+        review_type: 'flashcard',
+      }).catch(() => {});
+    }
     handleNextFlashcard();
   };
 
@@ -131,6 +153,15 @@ export const BatchStudyModal: React.FC<BatchStudyModalProps> = ({
       .filter((v) => v.length > 0);
 
     const isMatch = userClean === expectedClean || variants.includes(userClean);
+
+    if (currentWord?.id) {
+      api.submitReview({
+        word_id: currentWord.id,
+        quality_rating: isMatch ? 5 : 1,
+        review_type: 'typed',
+        user_answer: userClean,
+      }).catch(() => {});
+    }
 
     if (isMatch) {
       // 100% to'g'ri!
@@ -164,6 +195,14 @@ export const BatchStudyModal: React.FC<BatchStudyModalProps> = ({
   const handleRevealAnswer = () => {
     setTypedStatus('revealed');
     handleSpeak(currentWord.english_word);
+    if (currentWord?.id) {
+      api.submitReview({
+        word_id: currentWord.id,
+        quality_rating: 1,
+        review_type: 'typed',
+        user_answer: 'revealed',
+      }).catch(() => {});
+    }
   };
 
   const handleProceedAfterReveal = () => {

@@ -136,6 +136,19 @@ async def answer_quiz_question(
     if is_correct:
         attempt.correct_answers += 1
 
+    # Record review in SM-2 and WordProgress
+    from app.services.srs_service import process_word_review
+    await process_word_review(
+        user_id=user_id,
+        word_id=question.word_id,
+        quality_rating=5 if is_correct else 1,
+        review_type="quiz",
+        review_source="web",
+        user_answer=selected_option,
+        time_spent_ms=0,
+        db=db,
+    )
+
     await db.commit()
 
     return {

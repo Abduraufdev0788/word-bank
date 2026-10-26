@@ -115,8 +115,8 @@ class ApiClient {
     return this.request<DailyActivityChartPoint[]>('/analytics/weekly-chart');
   }
 
-  async getWeakWords(limit = 20): Promise<WeakWord[]> {
-    return this.request<WeakWord[]>(`/analytics/weak-words?limit=${limit}`);
+  async getWeakWords(limit = 20, randomize = false): Promise<WeakWord[]> {
+    return this.request<WeakWord[]>(`/analytics/weak-words?limit=${limit}&randomize=${randomize}`);
   }
 
   async getLevelAssessment(): Promise<LevelAssessment> {

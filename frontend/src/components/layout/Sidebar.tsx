@@ -12,6 +12,7 @@ import {
   Clock,
   PlusCircle,
   BrainCircuit,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStudyTime } from '../../context/StudyTimeContext';
@@ -61,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'batches', label: "To'plamlar (20 talik)", icon: Layers },
     { id: 'words', label: "So'zlar Banki", icon: BookOpen },
+    { id: 'mastered', label: "O'zlashtirilgan So'zlar", icon: CheckCircle2 },
     { id: 'stories', label: 'AI Mini Hikoyalar', icon: BrainCircuit },
     { id: 'weak', label: "Zaif So'zlar", icon: AlertCircle },
     { id: 'settings', label: 'Sozlamalar & Bot', icon: Settings },

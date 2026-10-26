@@ -174,6 +174,8 @@ export interface WeakWord {
   times_incorrect: number;
   accuracy_percent: number;
   last_reviewed_at?: string;
+  repetition_number?: number;
+  is_mastered?: boolean;
 }
 
 export interface ComprehensionQuestion {

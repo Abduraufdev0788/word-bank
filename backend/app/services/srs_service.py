@@ -91,16 +91,19 @@ async def process_word_review(
     else:
         progress.times_incorrect += 1
 
-    # Check mastery & weakness
-    if progress.repetition_number >= 5 and (progress.times_correct / progress.times_reviewed) >= 0.8:
+    # Check mastery & weakness:
+    # 3 consecutive correct answers (repetition_number >= 3 and is_correct) -> Mastered!
+    if progress.repetition_number >= 3 and is_correct:
         progress.is_mastered = True
-    else:
-        progress.is_mastered = False
-
-    if progress.times_incorrect >= 2 and (progress.times_incorrect / progress.times_reviewed) >= 0.4:
-        progress.is_weak = True
-    elif (progress.times_correct / max(1, progress.times_reviewed)) >= 0.7:
         progress.is_weak = False
+    elif not is_correct:
+        progress.is_mastered = False
+        progress.is_weak = True
+    else:
+        # Correct answer, but hasn't reached 3 consecutive repetitions yet
+        progress.is_mastered = False
+        if (progress.times_correct / max(1, progress.times_reviewed)) >= 0.7:
+            progress.is_weak = False
 
     # Create immutable review record
     review = WordReview(

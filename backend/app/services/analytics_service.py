@@ -218,6 +218,7 @@ class AnalyticsService:
         user_id: uuid.UUID,
         db: AsyncSession,
         limit: int = 20,
+        randomize: bool = False,
     ) -> List[WeakWordOut]:
         stmt = (
             select(Word, WordProgress)
@@ -226,13 +227,16 @@ class AnalyticsService:
                 Word.user_id == user_id,
                 (WordProgress.is_weak == True) | (WordProgress.times_incorrect > 0),  # noqa: E712
             )
-            .order_by(
+        )
+        if randomize:
+            stmt = stmt.order_by(func.random()).limit(limit)
+        else:
+            stmt = stmt.order_by(
                 WordProgress.times_incorrect.desc(),
                 WordProgress.is_weak.desc(),
                 WordProgress.times_reviewed.desc(),
-            )
-            .limit(limit)
-        )
+            ).limit(limit)
+
         result = await db.execute(stmt)
         rows = result.all()
 
@@ -254,6 +258,8 @@ class AnalyticsService:
                 times_incorrect=prog.times_incorrect,
                 accuracy_percent=accuracy,
                 last_reviewed_at=prog.last_reviewed_at,
+                repetition_number=prog.repetition_number,
+                is_mastered=prog.is_mastered,
             )
             weak_list.append(item)
 
@@ -299,48 +305,37 @@ class AnalyticsService:
         if untagged > 0:
             breakdown["A1"] += untagged
 
-        # Determine level based on vocabulary size thresholds & high-level tags
-        if total_words >= 3500:
-            estimated_level, next_level, target_for_next, current_base = "C2", "C2+", 5000, 3500
-        elif total_words >= 1800:
-            estimated_level, next_level, target_for_next, current_base = "C1", "C2", 3500, 1800
-        elif total_words >= 900:
-            estimated_level, next_level, target_for_next, current_base = "B2", "C1", 1800, 900
-        elif total_words >= 400:
-            estimated_level, next_level, target_for_next, current_base = "B1", "B2", 900, 400
-        elif total_words >= 150:
-            estimated_level, next_level, target_for_next, current_base = "A2", "B1", 400, 150
+        # Determine level strictly based on MASTERED vocabulary (not just raw imported/added words)
+        # Real linguistic retention thresholds:
+        if words_mastered >= 2500:
+            estimated_level, next_level, target_for_next, current_base = "C2", "C2+", 3500, 2500
+        elif words_mastered >= 1500:
+            estimated_level, next_level, target_for_next, current_base = "C1", "C2", 2500, 1500
+        elif words_mastered >= 700:
+            estimated_level, next_level, target_for_next, current_base = "B2", "C1", 1500, 700
+        elif words_mastered >= 300:
+            estimated_level, next_level, target_for_next, current_base = "B1", "B2", 700, 300
+        elif words_mastered >= 100:
+            estimated_level, next_level, target_for_next, current_base = "A2", "B1", 300, 100
         else:
-            estimated_level, next_level, target_for_next, current_base = "A1", "A2", 150, 0
+            estimated_level, next_level, target_for_next, current_base = "A1", "A2", 100, 0
 
-        # Check explicit higher level clusters
-        for lvl, nxt, tgt, base in [
-            ("C2", "C2+", 5000, 3500),
-            ("C1", "C2", 3500, 1800),
-            ("B2", "C1", 1800, 900),
-            ("B1", "B2", 900, 400),
-            ("A2", "B1", 400, 150),
-        ]:
-            if breakdown[lvl] >= 20:
-                estimated_level, next_level, target_for_next, current_base = lvl, nxt, tgt, base
-                break
-
-        # Calculate progress percent towards next level
+        # Calculate progress percent towards next level based on mastered words
         needed = target_for_next - current_base
-        achieved = total_words - current_base
+        achieved = max(0, words_mastered - current_base)
         progress_pct = (
-            round(min(100.0, max(5.0, (achieved / needed) * 100.0)), 1)
-            if needed > 0 and total_words > 0
+            round(min(100.0, max(0.0, (achieved / needed) * 100.0)), 1)
+            if needed > 0 and words_mastered > 0
             else 0.0
         )
-        words_to_next = max(0, target_for_next - total_words)
+        words_to_next = max(0, target_for_next - words_mastered)
 
-        if total_words >= 500:
+        if words_mastered >= 300:
             confidence = 0.85
-        elif total_words >= 100:
-            confidence = 0.7
+        elif words_mastered >= 50:
+            confidence = 0.70
         else:
-            confidence = max(0.3, round(total_words / 100.0, 2))
+            confidence = max(0.2, round(words_mastered / 50.0, 2))
 
         recs = [
             f"Sizning jami so'z boyligingiz {total_words} ta so'zdan iborat.",

@@ -117,7 +117,7 @@ async def end_study_session(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> StudySession:
-    """Explicitly concludes a study session."""
+    """Explicitly concludes a study session and flushes any pending elapsed active time."""
     stmt = select(StudySession).where(
         StudySession.id == session_id,
         StudySession.user_id == user_id,
@@ -127,8 +127,39 @@ async def end_study_session(
         raise ValueError("Sessiya topilmadi")
 
     now = utc_now()
+    if session.is_active:
+        last_hb = ensure_utc(session.last_heartbeat_at)
+        delta = (now - last_hb).total_seconds() if last_hb else 0
+        max_idle_seconds = settings.STUDY_SESSION_IDLE_TIMEOUT_MINUTES * 60
+        if 0 < delta <= max_idle_seconds:
+            # User was active right up until ending; flush remaining seconds (capped at 60s)
+            remaining_seconds = int(min(delta, 60))
+            if remaining_seconds > 0:
+                session.active_duration_seconds += remaining_seconds
+
+                today = now.date()
+                act_stmt = select(DailyActivity).where(
+                    DailyActivity.user_id == user_id,
+                    DailyActivity.activity_date == today,
+                )
+                activity = (await db.execute(act_stmt)).scalar_one_or_none()
+                if not activity:
+                    activity = DailyActivity(
+                        user_id=user_id,
+                        activity_date=today,
+                        total_active_seconds=remaining_seconds,
+                        words_learned=0,
+                        words_reviewed=0,
+                        quizzes_taken=0,
+                        streak_day_count=1,
+                    )
+                    db.add(activity)
+                else:
+                    activity.total_active_seconds += remaining_seconds
+
     session.is_active = False
     session.ended_at = now
+    session.last_heartbeat_at = now
     await db.commit()
     await db.refresh(session)
     return session

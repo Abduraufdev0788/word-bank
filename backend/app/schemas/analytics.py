@@ -62,6 +62,8 @@ class WeakWordOut(BaseModel):
     times_incorrect: int
     accuracy_percent: float
     last_reviewed_at: Optional[datetime] = None
+    repetition_number: int = 0
+    is_mastered: bool = False
 
 
 class CefrMilestoneOut(BaseModel):

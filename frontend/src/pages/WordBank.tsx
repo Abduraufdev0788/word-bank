@@ -14,15 +14,28 @@ import { Word } from '../types';
 
 interface WordBankProps {
   onOpenAddWord: () => void;
+  initialFilterMastered?: boolean;
 }
 
-export const WordBank: React.FC<WordBankProps> = ({ onOpenAddWord }) => {
+export const WordBank: React.FC<WordBankProps> = ({
+  onOpenAddWord,
+  initialFilterMastered = false,
+}) => {
   const [words, setWords] = useState<Word[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCefr, setSelectedCefr] = useState<string>('');
   const [filterWeak, setFilterWeak] = useState<boolean | undefined>(undefined);
-  const [filterMastered, setFilterMastered] = useState<boolean | undefined>(undefined);
+  const [filterMastered, setFilterMastered] = useState<boolean | undefined>(
+    initialFilterMastered ? true : undefined
+  );
+
+  useEffect(() => {
+    if (initialFilterMastered) {
+      setFilterMastered(true);
+      setFilterWeak(undefined);
+    }
+  }, [initialFilterMastered]);
 
   const fetchWords = async () => {
     try {
@@ -73,11 +86,25 @@ export const WordBank: React.FC<WordBankProps> = ({ onOpenAddWord }) => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-            <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-brand-400" />
-            <span>Mening Lug'at Bankim</span>
+            {filterMastered === true ? (
+              <>
+                <CheckCircle className="w-5 sm:w-6 h-5 sm:h-6 text-emerald-400" />
+                <span>O'zlashtirilgan So'zlar</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                  {words.length} ta so'z
+                </span>
+              </>
+            ) : (
+              <>
+                <BookOpen className="w-5 sm:w-6 h-5 sm:h-6 text-brand-400" />
+                <span>Mening Lug'at Bankim</span>
+              </>
+            )}
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Shaxsiy lug'at boyligingiz, izlash, filtrlash va talaffuzni tinglash
+            {filterMastered === true
+              ? "Ketma-ket kamida 3 marta to'g'ri topilib, uzoq muddatli xotiraga muhrlangan so'zlar"
+              : "Shaxsiy lug'at boyligingiz, izlash, filtrlash va talaffuzni tinglash"}
           </p>
         </div>
 

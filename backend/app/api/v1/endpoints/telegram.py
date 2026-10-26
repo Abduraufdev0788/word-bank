@@ -536,7 +536,7 @@ async def unlink_telegram_account(
 )
 async def get_telegram_weak_words(
     telegram_user_id: int,
-    limit: int = 10,
+    limit: int = 20,
     db: AsyncSession = Depends(get_db),
 ):
     user = await get_linked_user(telegram_user_id, db)
@@ -546,9 +546,9 @@ async def get_telegram_weak_words(
         .options(selectinload(Word.progress), selectinload(Word.examples))
         .where(
             Word.user_id == user.id,
-            (WordProgress.is_weak == True) | (WordProgress.ease_factor < 2.2),
+            (WordProgress.is_weak == True) | (WordProgress.times_incorrect > 0),
         )
-        .order_by(WordProgress.ease_factor.asc(), WordProgress.times_incorrect.desc())
+        .order_by(func.random())
         .limit(limit)
     )
     result = await db.execute(stmt)
@@ -560,7 +560,7 @@ async def get_telegram_weak_words(
             select(Word)
             .options(selectinload(Word.progress), selectinload(Word.examples))
             .where(Word.user_id == user.id)
-            .order_by(Word.created_at.desc())
+            .order_by(func.random())
             .limit(limit)
         )
         res_fb = await db.execute(fallback_stmt)

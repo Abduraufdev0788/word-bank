@@ -67,6 +67,7 @@ async def get_weekly_chart(
 )
 async def get_weak_words(
     limit: int = Query(20, ge=1, le=100),
+    randomize: bool = Query(False, description="Tasodifiy tartibda 20 ta so'z olish"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -74,6 +75,7 @@ async def get_weak_words(
         user_id=current_user.id,
         db=db,
         limit=limit,
+        randomize=randomize,
     )
 
 

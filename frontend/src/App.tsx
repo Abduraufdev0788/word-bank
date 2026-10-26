@@ -87,6 +87,11 @@ const MainApp: React.FC = () => {
         return { title: "Lug'at To'plamlari", subtitle: '20 talik qulay to\'plamlar' };
       case 'words':
         return { title: "Mening Lug'at Bankim", subtitle: 'Qidiruv, audio talaffuz va filtrlash' };
+      case 'mastered':
+        return {
+          title: "O'zlashtirilgan So'zlar",
+          subtitle: "3 marta ketma-ket to'g'ri topilib to'liq mustahkamlangan so'zlar",
+        };
       case 'stories':
         return { title: 'AI Mini Hikoyalar', subtitle: 'Google Gemini orqali kontekstual o\'qish' };
       case 'weak':
@@ -130,7 +135,7 @@ const MainApp: React.FC = () => {
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-20 md:pb-8">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-28 lg:pb-8">
           {currentTab === 'dashboard' && (
             <Dashboard
               onStartReview={() => handleSelectTab('review')}
@@ -139,6 +144,8 @@ const MainApp: React.FC = () => {
               onNavigateToBatches={() => handleSelectTab('batches')}
               onNavigateToWeakWords={() => handleSelectTab('weak')}
               onNavigateToStories={() => handleSelectTab('stories')}
+              onNavigateToMasteredWords={() => handleSelectTab('mastered')}
+              onNavigateToWords={() => handleSelectTab('words')}
             />
           )}
 
@@ -157,7 +164,17 @@ const MainApp: React.FC = () => {
           )}
 
           {currentTab === 'words' && (
-            <WordBank onOpenAddWord={() => setIsAddWordOpen(true)} />
+            <WordBank
+              onOpenAddWord={() => setIsAddWordOpen(true)}
+              initialFilterMastered={false}
+            />
+          )}
+
+          {currentTab === 'mastered' && (
+            <WordBank
+              onOpenAddWord={() => setIsAddWordOpen(true)}
+              initialFilterMastered={true}
+            />
           )}
 
           {currentTab === 'stories' && (
@@ -175,8 +192,8 @@ const MainApp: React.FC = () => {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (< 768px) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-900/95 backdrop-blur-lg border-t border-dark-800 px-3 py-1.5 flex items-center justify-around select-none shadow-2xl">
+      {/* Mobile & Tablet Bottom Navigation Bar (< 1024px) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-900/95 backdrop-blur-lg border-t border-dark-800 px-3 py-1.5 flex items-center justify-around select-none shadow-2xl">
         <button
           onClick={() => handleSelectTab('dashboard')}
           className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${

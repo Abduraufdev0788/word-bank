@@ -8,27 +8,30 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { WeakWord } from '../types';
+import { WeakWordsPracticeModal } from '../components/study/WeakWordsPracticeModal';
 
 interface WeakWordsProps {
-  onStartTargetedReview: () => void;
+  onStartTargetedReview?: () => void;
 }
 
-export const WeakWords: React.FC<WeakWordsProps> = ({ onStartTargetedReview }) => {
+export const WeakWords: React.FC<WeakWordsProps> = ({ onStartTargetedReview: _onStartTargetedReview }) => {
   const [weakWords, setWeakWords] = useState<WeakWord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
+
+  const fetchWeakWords = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getWeakWords(50);
+      setWeakWords(data);
+    } catch (err) {
+      console.error('Failed to load weak words:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchWeakWords = async () => {
-      try {
-        setLoading(true);
-        const data = await api.getWeakWords(50);
-        setWeakWords(data);
-      } catch (err) {
-        console.error('Failed to load weak words:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchWeakWords();
   }, []);
 
@@ -74,11 +77,11 @@ export const WeakWords: React.FC<WeakWordsProps> = ({ onStartTargetedReview }) =
 
         {weakWords.length > 0 && (
           <button
-            onClick={onStartTargetedReview}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 sm:px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-glow-rose transition-all shrink-0 active:scale-95"
+            onClick={() => setIsPracticeModalOpen(true)}
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 sm:px-6 py-3 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-accent-violet hover:from-rose-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-rose transition-all shrink-0 active:scale-95"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Zaif so'zlarni mustahkamlash</span>
+            <span>Zaif so'zlarni mashq qilish (20 ta random)</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         )}
@@ -140,6 +143,15 @@ export const WeakWords: React.FC<WeakWordsProps> = ({ onStartTargetedReview }) =
           ))}
         </div>
       )}
+
+      {/* Interactive 20-word random practice modal */}
+      <WeakWordsPracticeModal
+        isOpen={isPracticeModalOpen}
+        onClose={() => setIsPracticeModalOpen(false)}
+        onFinished={() => {
+          fetchWeakWords();
+        }}
+      />
     </div>
   );
 };
