@@ -19,11 +19,14 @@ import {
   Zap,
   Target,
   Mic,
+  ListTodo,
+  Check,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { DashboardStats, LevelAssessment } from '../types';
 import { LevelGrowthCard } from '../components/analytics/LevelGrowthCard';
 import { ActivityHeatmap } from '../components/analytics/ActivityHeatmap';
+import { MasteredBoosterModal } from '../components/study/MasteredBoosterModal';
 
 interface DashboardProps {
   onStartReview: () => void;
@@ -52,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [levelAssessment, setLevelAssessment] = useState<LevelAssessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMasteredBoosterOpen, setIsMasteredBoosterOpen] = useState(false);
 
   const fetchStats = async () => {
     try {
@@ -275,6 +279,211 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Today's Tasks & Missions Section */}
+      <div className="p-5 sm:p-7 rounded-3xl bg-gradient-to-r from-dark-900 via-dark-850 to-dark-900 border border-dark-800 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-brand-500/20 border border-brand-500/30 text-brand-400 flex items-center justify-center">
+              <ListTodo className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-white">
+                Bugungi Qilinadigan Ishlar
+              </h3>
+              <p className="text-xs text-slate-400">
+                Kunlik faoliyatingiz uchun belgilangan asosiy mashg'ulotlar va maqsadlar
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-mono font-bold text-slate-400 self-start sm:self-auto px-3 py-1 rounded-full bg-dark-950 border border-dark-800">
+            {todayFormatted}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+          {/* Task 1: 50 ta bilgan so'zni mustahkamlash */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-brand-950/40 via-dark-850 to-dark-900 border border-brand-500/30 hover:border-brand-500/50 transition-all flex flex-col justify-between gap-3 shadow-md group">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-brand-500/20 border border-brand-500/35 text-brand-300 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-extrabold text-white group-hover:text-brand-300 transition-colors">
+                      Bilgan so'zlarni mustahkamlash
+                    </h4>
+                    {(goals.mastered_reviewed_today || 0) >= 50 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Bajarildi
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Bugun o'zlashtirilgan so'zlaringiz orasidan 50 tasini qayta ishlab xotirani yangilang.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Bajarildi:</span>
+                <span className="font-mono font-bold text-white">
+                  {goals.mastered_reviewed_today || 0} / 50 ta so'z ({goals.mastered_goal_percent || 0}%)
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-dark-950 overflow-hidden border border-dark-800">
+                <div
+                  style={{ width: `${goals.mastered_goal_percent || 0}%` }}
+                  className="h-full bg-gradient-to-r from-brand-600 via-accent-violet to-accent-cyan rounded-full transition-all duration-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMasteredBoosterOpen(true)}
+                className="w-full mt-2 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>
+                  {(goals.mastered_reviewed_today || 0) >= 50
+                    ? "Yana 50 ta so'zni mustahkamlash"
+                    : "50 ta so'zni boshlash 🚀"}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Task 2: Kunlik SRS Takrorlash */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-dark-850 border border-dark-750/90 hover:border-dark-700 transition-all flex flex-col justify-between gap-3 shadow-md group">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-extrabold text-white group-hover:text-amber-300 transition-colors">
+                      Kunlik SRS Takrorlash
+                    </h4>
+                    {stats.words_due_today === 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Navbat toza
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Spaced Repetition SM-2 algoritmi belgilagan bugungi so'zlarni takrorlang.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Navbatdagi so'zlar:</span>
+                <span className="font-mono font-bold text-amber-300">
+                  {stats.words_due_today > 0 ? `${stats.words_due_today} ta so'z` : "To'liq bajarildi"}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-dark-950 overflow-hidden border border-dark-800">
+                <div
+                  style={{ width: `${Math.min(100, goals.review_goal_percent)}%` }}
+                  className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={onStartReview}
+                className="w-full mt-2 py-2.5 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <span>{stats.words_due_today > 0 ? "Takrorlashni boshlash" : "Erkin takrorlash"}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Task 3: Bilmagan / Zaif so'zlar laboratoriyasi */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-dark-850 border border-dark-750/90 hover:border-rose-500/40 transition-all flex flex-col justify-between gap-3 shadow-md group">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white group-hover:text-rose-300 transition-colors">
+                    Bilmagan so'zlar laboratoriyasi
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Barcha bo'limlarda xato qilingan so'zlar shu yerga tushadi. 3 marta to'g'ri topsangiz o'zlashtiriladi.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">E'tibor talab so'zlar:</span>
+                <span className="font-mono font-bold text-rose-400">
+                  {stats.words_weak} ta so'z
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onNavigateToWeakWords}
+                className="w-full mt-2 py-2.5 rounded-xl bg-dark-800 hover:bg-rose-950/30 border border-rose-500/30 text-rose-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <span>Zaif so'zlarni mashq qilish</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Task 4: Yangi so'z o'rganish */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-dark-850 border border-dark-750/90 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-3 shadow-md group">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-accent-cyan flex items-center justify-center shrink-0 mt-0.5">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white group-hover:text-cyan-300 transition-colors">
+                    Kunlik yangi so'z maqsadi
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Bugun lug'at boyligingizni yangi inglizcha so'zlar bilan kengaytiring.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Yangi so'zlar:</span>
+                <span className="font-mono font-bold text-accent-cyan">
+                  {goals.words_learned_today} / {goals.daily_words_goal} ta so'z ({goals.words_goal_percent}%)
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-dark-950 overflow-hidden border border-dark-800">
+                <div
+                  style={{ width: `${Math.min(100, goals.words_goal_percent)}%` }}
+                  className="h-full bg-gradient-to-r from-cyan-600 to-sky-400 rounded-full transition-all duration-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={onOpenAddWord}
+                className="w-full mt-2 py-2.5 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <span>Yangi so'z kiritish</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* KPI Metrics Cards (4 Columns) with rich glowing gradients */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
@@ -538,6 +747,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
+            {/* Mastered 50-Word Challenge Goal */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400 font-medium">Bilgan so'zlar (50 challenge):</span>
+                <span className="font-bold text-brand-300 font-mono">
+                  {goals.mastered_reviewed_today || 0} / 50 ta so'z
+                </span>
+              </div>
+              <div className="h-2.5 rounded-full bg-dark-950 p-0.5 border border-dark-800 overflow-hidden">
+                <div
+                  style={{ width: `${goals.mastered_goal_percent || 0}%` }}
+                  className="h-full bg-gradient-to-r from-brand-600 via-accent-violet to-accent-cyan rounded-full transition-all duration-500"
+                />
+              </div>
+            </div>
+
             {/* Study Time Goal */}
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs">
@@ -597,6 +822,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* 50-Word Mastered Booster Practice Modal */}
+      <MasteredBoosterModal
+        isOpen={isMasteredBoosterOpen}
+        onClose={() => setIsMasteredBoosterOpen(false)}
+        onComplete={() => {
+          fetchStats();
+          setIsMasteredBoosterOpen(false);
+        }}
+      />
     </div>
   );
 };

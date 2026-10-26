@@ -118,6 +118,9 @@ export interface GoalProgress {
   daily_study_time_minutes: number;
   study_time_minutes_today: number;
   study_time_goal_percent: number;
+  daily_mastered_goal?: number;
+  mastered_reviewed_today?: number;
+  mastered_goal_percent?: number;
 }
 
 export interface RecentActivityItem {
@@ -162,6 +165,7 @@ export interface DashboardStats {
   recent_activities: RecentActivityItem[];
   suggested_action: string;
   is_first_time_user: boolean;
+  mastered_practice_words_available?: number;
 }
 
 export interface WeakWord {

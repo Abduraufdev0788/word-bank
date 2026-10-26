@@ -24,6 +24,80 @@ router = APIRouter()
 
 
 @router.get(
+    "/mastered-practice",
+    response_model=List[WordOut],
+    summary="Kunlik 50 ta o'zlashtirilgan/bilgan so'zlarni mashq qilish uchun olish",
+)
+async def get_mastered_practice_words(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Returns up to 50 randomized mastered or known words for daily booster practice."""
+    # 1. Strictly mastered words
+    stmt_mastered = (
+        select(Word)
+        .options(
+            selectinload(Word.examples),
+            selectinload(Word.progress),
+        )
+        .join(WordProgress, Word.id == WordProgress.word_id)
+        .where(
+            Word.user_id == current_user.id,
+            WordProgress.is_mastered == True,  # noqa: E712
+        )
+        .order_by(func.random())
+        .limit(limit)
+    )
+    result = await db.execute(stmt_mastered)
+    words = list(result.scalars().all())
+
+    # 2. Supplement with words with correct answers if needed
+    if len(words) < limit:
+        needed = limit - len(words)
+        existing_ids = [w.id for w in words]
+        stmt_supplement = (
+            select(Word)
+            .options(
+                selectinload(Word.examples),
+                selectinload(Word.progress),
+            )
+            .join(WordProgress, Word.id == WordProgress.word_id)
+            .where(
+                Word.user_id == current_user.id,
+                WordProgress.times_correct >= 1,
+                Word.id.not_in(existing_ids) if existing_ids else True,
+            )
+            .order_by(func.random())
+            .limit(needed)
+        )
+        sup_result = await db.execute(stmt_supplement)
+        words.extend(sup_result.scalars().all())
+
+    # 3. Supplement with any words if user is new
+    if len(words) < limit:
+        needed = limit - len(words)
+        existing_ids = [w.id for w in words]
+        stmt_any = (
+            select(Word)
+            .options(
+                selectinload(Word.examples),
+                selectinload(Word.progress),
+            )
+            .where(
+                Word.user_id == current_user.id,
+                Word.id.not_in(existing_ids) if existing_ids else True,
+            )
+            .order_by(func.random())
+            .limit(needed)
+        )
+        any_result = await db.execute(stmt_any)
+        words.extend(any_result.scalars().all())
+
+    return words
+
+
+@router.get(
     "",
     response_model=List[WordOut],
     summary="Foydalanuvchi so'zlar ro'yxatini qidirish va filtrlash",

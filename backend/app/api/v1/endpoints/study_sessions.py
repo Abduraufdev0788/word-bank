@@ -97,6 +97,11 @@ async def stop_session(
     response_model=StudyTimeSummaryOut,
     summary="Foydalanuvchining bugungi, haftalik va jami faol o'rganish vaqti",
 )
+@router.get(
+    "/summary",
+    response_model=StudyTimeSummaryOut,
+    include_in_schema=False,
+)
 async def get_stats(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),

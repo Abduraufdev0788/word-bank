@@ -184,3 +184,30 @@ async def test_export_vocabulary_csv_and_json(client: AsyncClient):
     data = json_resp.json()
     assert len(data) == 1
     assert data[0]["english_word"] == "exportword"
+
+
+@pytest.mark.asyncio
+async def test_mastered_practice_words_endpoint(client: AsyncClient):
+    token = await create_user_and_get_token(client, "booster_user@smartvocab.uz")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Add 2 words
+    await client.post(
+        "/api/v1/vocabulary",
+        json={"english_word": "BoosterOne", "uzbek_translation": "Birinchi kuchaytiruvchi"},
+        headers=headers,
+    )
+    await client.post(
+        "/api/v1/vocabulary",
+        json={"english_word": "BoosterTwo", "uzbek_translation": "Ikkinchi kuchaytiruvchi"},
+        headers=headers,
+    )
+
+    # Fetch mastered practice words
+    resp = await client.get("/api/v1/vocabulary/mastered-practice?limit=50", headers=headers)
+    assert resp.status_code == 200
+    words = resp.json()
+    assert len(words) == 2
+    words_en = [w["english_word"] for w in words]
+    assert "boosterone" in words_en
+    assert "boostertwo" in words_en

@@ -69,9 +69,9 @@ export const WeakWords: React.FC<WeakWordsProps> = ({ onStartTargetedReview: _on
               {weakWords.length} ta e'tibor talab qiluvchi so'z
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">Zaif So'zlar Laboratoriyasi</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-white">Bilmagan So'zlar Laboratoriyasi</h2>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Takrorlashlar va testlarda eng ko'p adashilgan yoki unutilgan so'zlar ro'yxati. Bu so'zlarga alohida e'tibor qaratish orqali xotiradagi bo'shliqlarni to'ldirasiz.
+            Barcha bo'limlarda (kunlik takrorlash, testlar, viktorinalar) xato qilingan yoki qiynalgan so'zlaringiz shu yerda to'planadi. So'zni mashg'ulotlarda ketma-ket 3 marta to'g'ri topsangiz, u to'liq o'zlashtiriladi va bu ro'yxatdan chiqariladi.
           </p>
         </div>
 

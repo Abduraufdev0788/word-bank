@@ -1,8 +1,8 @@
 import math
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Dict, List, Optional
-from sqlalchemy import case, func, select
+from sqlalchemy import case, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,10 +57,39 @@ class AnalyticsService:
             select(func.count(WordProgress.id))
             .where(
                 WordProgress.user_id == user_id,
+                WordProgress.is_mastered == False,  # noqa: E712
                 (WordProgress.is_weak == True) | (WordProgress.times_incorrect > 0),  # noqa: E712
             )
         )
         words_weak = (await db.execute(weak_stmt)).scalar_one() or 0
+
+        # Count mastered/known words available for practice
+        avail_mastered_stmt = (
+            select(func.count(WordProgress.id))
+            .where(
+                WordProgress.user_id == user_id,
+                or_(WordProgress.is_mastered == True, WordProgress.times_correct >= 1),  # noqa: E712
+            )
+        )
+        mastered_practice_words_available = (await db.execute(avail_mastered_stmt)).scalar_one() or 0
+
+        # Mastered words practiced today
+        today_start = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
+        mastered_today_stmt = (
+            select(func.count(distinct(WordReview.word_id)))
+            .join(WordProgress, WordReview.word_id == WordProgress.word_id)
+            .where(
+                WordReview.user_id == user_id,
+                WordReview.created_at >= today_start,
+                or_(
+                    WordReview.review_type == "mastered_booster",
+                    WordProgress.is_mastered == True,  # noqa: E712
+                ),
+            )
+        )
+        mastered_reviewed_today = (await db.execute(mastered_today_stmt)).scalar() or 0
+        daily_mastered_goal = 50
+        mastered_goal_percent = round(min((mastered_reviewed_today / daily_mastered_goal) * 100.0, 100.0), 1)
 
         # 2. Total active study time across all days
         total_time_stmt = select(func.sum(DailyActivity.total_active_seconds)).where(
@@ -122,6 +151,9 @@ class AnalyticsService:
             daily_study_time_minutes=daily_study_time_goal,
             study_time_minutes_today=today_study_time_minutes,
             study_time_goal_percent=round(min((today_study_time_minutes / daily_study_time_goal) * 100.0, 100.0), 1),
+            daily_mastered_goal=daily_mastered_goal,
+            mastered_reviewed_today=mastered_reviewed_today,
+            mastered_goal_percent=mastered_goal_percent,
         )
 
         # 6. Weekly chart (last 7 days)
@@ -211,6 +243,7 @@ class AnalyticsService:
             recent_activities=recent_activities,
             suggested_action=suggested_action,
             is_first_time_user=is_first_time,
+            mastered_practice_words_available=mastered_practice_words_available,
         )
 
     async def get_weak_words_list(
@@ -225,6 +258,7 @@ class AnalyticsService:
             .join(WordProgress, Word.id == WordProgress.word_id)
             .where(
                 Word.user_id == user_id,
+                WordProgress.is_mastered == False,  # noqa: E712
                 (WordProgress.is_weak == True) | (WordProgress.times_incorrect > 0),  # noqa: E712
             )
         )

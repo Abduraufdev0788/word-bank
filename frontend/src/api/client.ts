@@ -190,6 +190,10 @@ class ApiClient {
     return this.request<Word[]>(`/vocabulary${qs ? `?${qs}` : ''}`);
   }
 
+  async getMasteredPracticeWords(limit = 50): Promise<Word[]> {
+    return this.request<Word[]>(`/vocabulary/mastered-practice?limit=${limit}`);
+  }
+
   async createWord(data: {
     english_word: string;
     uzbek_translation: string;

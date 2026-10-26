@@ -22,6 +22,9 @@ class GoalProgressOut(BaseModel):
     daily_study_time_minutes: int
     study_time_minutes_today: int
     study_time_goal_percent: float
+    daily_mastered_goal: int = 50
+    mastered_reviewed_today: int = 0
+    mastered_goal_percent: float = 0.0
 
 
 class RecentActivityItem(BaseModel):
@@ -49,6 +52,7 @@ class DashboardStatsOut(BaseModel):
     recent_activities: List[RecentActivityItem]
     suggested_action: str
     is_first_time_user: bool
+    mastered_practice_words_available: int = 0
 
 
 class WeakWordOut(BaseModel):

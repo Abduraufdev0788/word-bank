@@ -581,6 +581,7 @@ async def get_telegram_weak_words(
         .options(selectinload(Word.progress), selectinload(Word.examples))
         .where(
             Word.user_id == user.id,
+            WordProgress.is_mastered == False,
             (WordProgress.is_weak == True) | (WordProgress.times_incorrect > 0),
         )
         .order_by(func.random())
