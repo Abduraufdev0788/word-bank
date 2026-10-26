@@ -108,6 +108,7 @@ def build_bot_application() -> Application:
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("link", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("review", start_review))
     app.add_handler(CommandHandler("quiz", start_quiz))

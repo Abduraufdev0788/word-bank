@@ -35,7 +35,22 @@ async def get_settings(
 @router.put(
     "/settings",
     response_model=UserSettingsOut,
-    summary="Foydalanuvchi ta'lim sozlamalarini yangilash",
+    summary="Foydalanuvchi ta'lim sozlamalarini yangilash (PUT)",
+)
+@router.patch(
+    "/settings",
+    response_model=UserSettingsOut,
+    summary="Foydalanuvchi ta'lim sozlamalarini yangilash (PATCH)",
+)
+@router.patch(
+    "/preferences",
+    response_model=UserSettingsOut,
+    summary="Foydalanuvchi preferensiyalarini yangilash (PATCH)",
+)
+@router.put(
+    "/preferences",
+    response_model=UserSettingsOut,
+    summary="Foydalanuvchi preferensiyalarini yangilash (PUT)",
 )
 async def update_settings(
     settings_in: UserSettingsUpdate,

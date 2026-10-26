@@ -59,7 +59,13 @@ async def get_linked_user(telegram_user_id: int, db: AsyncSession) -> User:
     "/link-token",
     response_model=CreateLinkTokenOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Web foydalanuvchisi uchun Telegram bog'lash tokenini yaratish",
+    summary="Web foydalanuvchisi uchun Telegram bog'lash tokenini yaratish (POST)",
+)
+@router.get(
+    "/link-token",
+    response_model=CreateLinkTokenOut,
+    status_code=status.HTTP_200_OK,
+    summary="Web foydalanuvchisi uchun Telegram bog'lash tokenini yaratish (GET)",
 )
 async def create_link_token(
     current_user: User = Depends(get_current_active_user),
@@ -79,11 +85,17 @@ async def create_link_token(
     db.add(link_token_obj)
     await db.commit()
 
-    bot_url = f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={token}"
+    bot_username = settings.TELEGRAM_BOT_USERNAME.lstrip('@')
+    bot_url = f"https://t.me/{bot_username}?start={token}"
+    expires_in_secs = int(settings.TELEGRAM_LINK_TOKEN_EXPIRE_MINUTES * 60)
+
     return CreateLinkTokenOut(
         link_token=token,
+        token=token,
         bot_url=bot_url,
+        bot_username=bot_username,
         expires_at=expires_at,
+        expires_in_seconds=expires_in_secs,
     )
 
 

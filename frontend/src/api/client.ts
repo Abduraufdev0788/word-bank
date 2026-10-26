@@ -96,12 +96,21 @@ class ApiClient {
   }
 
   async getMe(): Promise<User> {
-    return this.request<User>('/auth/me');
+    const raw = await this.request<any>('/auth/me');
+    return {
+      ...raw,
+      preferred_cefr_level: raw.settings?.preferred_cefr_level || raw.preferred_cefr_level || 'B1',
+      daily_words_goal: raw.settings?.daily_words_goal || raw.daily_words_goal || 10,
+      daily_review_goal: raw.settings?.daily_review_goal || raw.daily_review_goal || 20,
+      daily_study_time_minutes: raw.settings?.daily_study_time_minutes || raw.daily_study_time_minutes || 20,
+      is_telegram_linked: Boolean(raw.is_telegram_linked || raw.telegram_username),
+      telegram_username: raw.telegram_username,
+    };
   }
 
-  async updateProfile(data: Partial<User>): Promise<User> {
-    return this.request<User>('/users/preferences', {
-      method: 'PATCH',
+  async updateProfile(data: any): Promise<any> {
+    return this.request<any>('/users/settings', {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
@@ -311,8 +320,20 @@ class ApiClient {
   }
 
   // --- Telegram Link ---
-  async getTelegramLinkToken(): Promise<{ token: string; expires_in_seconds: number; bot_username: string }> {
-    return this.request<{ token: string; expires_in_seconds: number; bot_username: string }>('/telegram/link-token');
+  async getTelegramLinkToken(): Promise<{
+    link_token: string;
+    token?: string;
+    bot_url?: string;
+    bot_username?: string;
+    expires_in_seconds?: number;
+  }> {
+    return this.request<{
+      link_token: string;
+      token?: string;
+      bot_url?: string;
+      bot_username?: string;
+      expires_in_seconds?: number;
+    }>('/telegram/link-token', { method: 'POST' });
   }
 }
 

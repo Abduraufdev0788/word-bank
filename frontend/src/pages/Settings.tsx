@@ -52,10 +52,12 @@ export const Settings: React.FC = () => {
     setTokenLoading(true);
     try {
       const data = await api.getTelegramLinkToken();
-      setTelegramToken(data.token);
-      setBotUsername(data.bot_username || 'smartvocab_bot');
+      const token = data.link_token || data.token || '';
+      setTelegramToken(token);
+      const uname = (data.bot_username || 'english_learn_daily_robot').replace(/^@/, '');
+      setBotUsername(uname);
     } catch (err: any) {
-      alert("Telegram token yaratishda xato: " + err.message);
+      alert("Telegram token yaratishda xato: " + (err.message || 'Noma\'lum xatolik'));
     } finally {
       setTokenLoading(false);
     }
@@ -168,13 +170,13 @@ export const Settings: React.FC = () => {
               Veb-sayt va Telegram botingiz umumiy bazada ishlaydi. Bot orqali kunlik takrorlashlarni yechish, yangi so'zlarni kiritish va xabarnomalar olishingiz mumkin.
             </p>
 
-            {user?.telegram_username ? (
+            {user?.is_telegram_linked || user?.telegram_username ? (
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
                 <p className="font-bold flex items-center gap-1.5">
                   <Check className="w-4 h-4" /> Telegram hisobingiz ulangan!
                 </p>
                 <p className="text-[11px] text-slate-300">
-                  Foydalanuvchi: <strong>@{user.telegram_username}</strong>
+                  Foydalanuvchi: <strong>@{user?.telegram_username || 'Ulangan'}</strong>
                 </p>
               </div>
             ) : (

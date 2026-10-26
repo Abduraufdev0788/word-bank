@@ -3,6 +3,7 @@ export interface User {
   email: string;
   full_name?: string;
   telegram_username?: string;
+  is_telegram_linked?: boolean;
   preferred_cefr_level?: string;
   daily_words_goal: number;
   daily_review_goal: number;

@@ -15,7 +15,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not user or not chat:
         return
 
-    # Check if a linking token was passed: /start <token>
+    # Check if /link was called without args
+    raw_text = getattr(update.message, "text", None)
+    if isinstance(raw_text, str) and raw_text.startswith("/link") and not (context.args and len(context.args) > 0):
+        await update.message.reply_text(
+            "ℹ️ **Hisobni ulash uchun:**\n"
+            "Veb-saytdagi **Sozlamalar** sahifasidan 'Xavfsiz ulanish kodini olish' tugmasini bosing va chiqqan kodni botga yuboring:\n"
+            "Masalan: `/link <sizning_kodingiz>` yoki shunchaki 'To'g'ridan-to'g'ri Telegramda ochish' tugmasini bosing.",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Check if a linking token was passed: /start <token> or /link <token>
     args = context.args
     if args and len(args) > 0:
         token = args[0].strip()

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_BOT_USERNAME: str = "SmartVocabAIBot"
+    TELEGRAM_BOT_USERNAME: str = "english_learn_daily_robot"
     TELEGRAM_LINK_TOKEN_EXPIRE_MINUTES: int = 15
     BACKEND_INTERNAL_API_URL: str = "http://localhost:8000/api/v1"
 

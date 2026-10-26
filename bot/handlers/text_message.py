@@ -21,9 +21,32 @@ async def handle_user_text_message(update: Update, context: ContextTypes.DEFAULT
     # Check if user is linked
     summary = await api_client.get_user_summary(user.id)
     if not summary or not summary.get("is_linked"):
+        clean_token = text.replace("/link", "").replace("link", "").strip()
+        if len(clean_token) >= 20 and " " not in clean_token:
+            link_result = await api_client.verify_link(
+                token=clean_token,
+                telegram_user_id=user.id,
+                telegram_chat_id=chat.id,
+                username=user.username,
+                first_name=user.first_name,
+            )
+            if link_result.get("success"):
+                data = link_result.get("data", {})
+                full_name = data.get("full_name") or user.first_name
+                await update.message.reply_text(
+                    f"🎉 **Tabriklaymiz, {full_name}!**\n\n"
+                    f"Telegram hisobingiz **SmartVocab AI** platformasiga muvaffaqiyatli bog'landi.\n"
+                    f"Bog'langan hisob: `{data.get('email')}`\n\n"
+                    f"Endi saytdagi barcha so'zlaringiz va takrorlashlaringiz shu bot orqali avtomatik sinxronlashadi!\n\n"
+                    f"Quyidagi menyu orqali mashg'ulotni boshlashingiz mumkin:",
+                    reply_markup=main_menu_keyboard(is_linked=True),
+                    parse_mode="Markdown",
+                )
+                return
+
         await update.message.reply_text(
             "👋 Salom! Botdan to'liq foydalanish va so'zlarni saqlash uchun "
-            "avval hisobingizni bog'lang: /start",
+            "avval hisobingizni bog'lang: saytdan linking kodini oling yoki /start buyrug'ini yuboring.",
             reply_markup=main_menu_keyboard(False),
         )
         return

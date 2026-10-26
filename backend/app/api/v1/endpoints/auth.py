@@ -178,6 +178,11 @@ async def get_me(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """Returns profile and settings of current authenticated user."""
+    tg_username = (
+        current_user.telegram_account.username
+        if current_user.telegram_account
+        else None
+    )
     return UserOut(
         id=current_user.id,
         email=current_user.email,
@@ -187,4 +192,5 @@ async def get_me(
         created_at=current_user.created_at,
         settings=current_user.settings,
         is_telegram_linked=current_user.telegram_account is not None,
+        telegram_username=tg_username,
     )

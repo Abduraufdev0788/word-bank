@@ -64,3 +64,4 @@ class UserOut(BaseModel):
     created_at: datetime
     settings: Optional[UserSettingsOut] = None
     is_telegram_linked: bool = False
+    telegram_username: Optional[str] = None

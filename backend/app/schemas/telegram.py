@@ -8,6 +8,9 @@ class CreateLinkTokenOut(BaseModel):
     link_token: str
     bot_url: str
     expires_at: datetime
+    token: Optional[str] = None
+    bot_username: Optional[str] = None
+    expires_in_seconds: Optional[int] = None
 
 
 class VerifyLinkIn(BaseModel):
