@@ -18,6 +18,7 @@ import {
   Trophy,
   Zap,
   Target,
+  Mic,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { DashboardStats, LevelAssessment } from '../types';
@@ -33,6 +34,7 @@ interface DashboardProps {
   onNavigateToStories: () => void;
   onNavigateToMasteredWords?: () => void;
   onNavigateToWords?: () => void;
+  onNavigateToSpeaking?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -44,6 +46,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToStories,
   onNavigateToMasteredWords,
   onNavigateToWords,
+  onNavigateToSpeaking,
 }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [levelAssessment, setLevelAssessment] = useState<LevelAssessment | null>(null);
@@ -373,7 +376,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="text-xs text-slate-400">Kerakli bo'limni tanlang</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {/* AI Speaking Coach */}
+          <div
+            onClick={onNavigateToSpeaking}
+            className="p-5 rounded-2xl bg-dark-900 border border-dark-800 hover:border-emerald-500/50 hover:bg-dark-850/80 transition-all cursor-pointer group shadow-md"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <Mic className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-extrabold text-white group-hover:text-emerald-300 transition-colors">
+              AI Speaking (Talaffuz)
+            </h4>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Mavzu tanlang, gapiring va real vaqtda talaffuzingizni baholang.
+            </p>
+          </div>
+
           {/* Reverse Recall / Typed Recall */}
           <div
             onClick={onStartReview}

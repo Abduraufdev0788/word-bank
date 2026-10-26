@@ -12,6 +12,13 @@ from app.schemas.ai import (
     MiniStoryResponse,
     ComprehensionQuestionSchema,
 )
+from app.schemas.speaking import (
+    SpeakingSessionResponse,
+    SpeakingSentenceItem,
+    VocabularyHighlightItem,
+    AnalyzeSpeakingAttemptResponse,
+    WordComparisonItem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -315,5 +322,219 @@ class AIService:
             detail="Hikoya yaratish muvaffaqiyatsiz tugadi.",
         )
 
+    async def generate_speaking_session(
+        self,
+        topic: str,
+        cefr_level: str = "B1",
+        user_words: Optional[List[str]] = None,
+        sentence_count: int = 5,
+    ) -> SpeakingSessionResponse:
+        """Generates a structured speaking monologue/dialogue session based on topic and CEFR level."""
+        clean_words = [w.strip() for w in (user_words or []) if w and len(w.strip()) > 1][:8]
+        words_clause = ""
+        if clean_words:
+            words_clause = (
+                f"\nFoydalanuvchi hozirda o'rganayotgan quyidagi so'zlarni ham nutq matniga tabiiy ravishda kirit:\n"
+                f"{', '.join(clean_words)}\n"
+            )
+
+        prompt = (
+            f"Sen ingliz tili bo'yicha professional Native Speech Coach va til o'rgatuvchisan.\n"
+            f"Foydalanuvchi quyidagi mavzu bo'yicha og'zaki nutq (Speaking practice) mashq qilmoqchi:\n"
+            f"Mavzu: \"{topic}\"\n"
+            f"CEFR Darajasi: {cefr_level}\n"
+            f"Gaplar soni: {sentence_count} ta{words_clause}\n\n"
+            f"Talablar:\n"
+            f"1. title: Nutq uchun qisqa va jozibali inglizcha sarlavha.\n"
+            f"2. overview_uz: Nutq qanday vaziyatda aytilayotgani, uning intonatsiyasi va talaffuziga doir 1-2 jumlalik o'zbekcha yo'riqnoma.\n"
+            f"3. full_text_en: Barcha gaplarni o'z ichiga olgan to'liq inglizcha matn.\n"
+            f"4. sentences: Aniq {sentence_count} ta ketma-ket gap. Har bir gap uchun:\n"
+            f"   - id: 1, 2, 3...\n"
+            f"   - text_en: Tabiiy, ravon inglizcha gap.\n"
+            f"   - text_uz: Aniq va ravon o'zbekcha tarjima.\n"
+            f"   - phonetic_tips: Ushbu gapdagi qiyinroq tovushlar, bog'lanishlar (linking) yoki urg'u bo'yicha qisqa amaliy maslahat.\n"
+            f"   - target_words: Gapdagi muhim kalit so'zlar ro'yxati.\n"
+            f"5. vocabulary_highlights: Matndagi 3-5 ta eng foydali so'z/iboralar (word, translation_uz, pronunciation (IPA), tip)."
+        )
+
+        try:
+            client = self._get_client()
+            from google.genai import types
+
+            def _call():
+                return client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=SpeakingSessionResponse,
+                    ),
+                )
+
+            response = await asyncio.to_thread(_call)
+            if hasattr(response, "parsed") and response.parsed is not None:
+                return response.parsed
+            return SpeakingSessionResponse.model_validate_json(response.text)
+        except Exception as e:
+            logger.warning(f"Gemini speaking generation failed, using intelligent fallback: {e}")
+            return self._fallback_speaking_session(topic, cefr_level, clean_words, sentence_count)
+
+    def _fallback_speaking_session(
+        self,
+        topic: str,
+        cefr_level: str,
+        user_words: List[str],
+        sentence_count: int,
+    ) -> SpeakingSessionResponse:
+        """Intelligent fallback when Gemini API is offline or key missing."""
+        clean_topic = topic.strip().capitalize()
+        return SpeakingSessionResponse(
+            topic=clean_topic,
+            cefr_level=cefr_level,
+            title=f"Speaking Practice: {clean_topic}",
+            overview_uz=f"Ushbu mashg'ulotda siz '{clean_topic}' mavzusida {cefr_level} darajasiga mos ravon inglizcha nutqni mashq qilasiz.",
+            full_text_en=(
+                f"Today I want to share my thoughts on {topic.lower()}. "
+                f"It is an important subject that plays a significant role in my daily life. "
+                f"Whenever I face challenges in this area, I try to stay focused and positive. "
+                f"Learning to communicate effectively about it helps me gain confidence. "
+                f"In the future, I plan to explore this topic even further and achieve my goals."
+            ),
+            sentences=[
+                SpeakingSentenceItem(
+                    id=1,
+                    text_en=f"Today I want to share my thoughts on {topic.lower()}.",
+                    text_uz=f"Bugun men {topic.lower()} haqidagi fikrlarim bilan o'rtoqlashmoqchiman.",
+                    phonetic_tips="'want to' birikmasini 'wanna' deb ravon bog'lab talaffuz qilish mumkin.",
+                    target_words=["share", "thoughts"],
+                ),
+                SpeakingSentenceItem(
+                    id=2,
+                    text_en="It is an important subject that plays a significant role in my daily life.",
+                    text_uz="Bu mening kundalik hayotimda muhim rol o'ynaydigan ahamiyatli mavzudir.",
+                    phonetic_tips="'significant' so'zida urg'u ikkinchi bo'g'inga tushadi: /sɪɡˈnɪf.ɪ.kənt/.",
+                    target_words=["significant", "role"],
+                ),
+                SpeakingSentenceItem(
+                    id=3,
+                    text_en="Whenever I face challenges in this area, I try to stay focused and positive.",
+                    text_uz="Bu sohada qiyinchiliklarga duch kelganimda, diqqatni jamlab ijobiy bo'lishga harakat qilaman.",
+                    phonetic_tips="'challenges' so'zida oxirgi 'es' tovushini /ɪz/ deb aniq talaffuz qiling.",
+                    target_words=["challenges", "focused"],
+                ),
+                SpeakingSentenceItem(
+                    id=4,
+                    text_en="Learning to communicate effectively about it helps me gain confidence.",
+                    text_uz="Bu haqda samarali muloqot qilishni o'rganish menga ishonch qozonishga yordam beradi.",
+                    phonetic_tips="'effectively' so'zida 'eff' qismini qattiq emas, yumshoq /ɪˈfek.tɪv.li/ deb ayting.",
+                    target_words=["communicate", "confidence"],
+                ),
+                SpeakingSentenceItem(
+                    id=5,
+                    text_en="In the future, I plan to explore this topic even further and achieve my goals.",
+                    text_uz="Kelajakda men bu mavzuni yanada chuqurroq o'rganishni va maqsadlarimga erishishni rejalashtirganman.",
+                    phonetic_tips="'achieve' so'zida 'ch' tovushini aniq /əˈtʃiːv/ deb ayting.",
+                    target_words=["explore", "achieve"],
+                ),
+            ],
+            vocabulary_highlights=[
+                VocabularyHighlightItem(
+                    word="significant",
+                    translation_uz="ahamiyatli, muhim",
+                    pronunciation="/sɪɡˈnɪf.ɪ.kənt/",
+                    tip="Biror narsaning ta'siri katta ekanligini ifodalashda ishlatiladi.",
+                ),
+                VocabularyHighlightItem(
+                    word="confidence",
+                    translation_uz="ishonch, o'ziga ishonch",
+                    pronunciation="/ˈkɒn.fɪ.dəns/",
+                    tip="Nutqda jur'at bilan gapirish uchun zaruriy xususiyat.",
+                ),
+                VocabularyHighlightItem(
+                    word="achieve",
+                    translation_uz="erishmoq, qo'lga kiritmoq",
+                    pronunciation="/əˈtʃiːv/",
+                    tip="Maqsad va orzularga nisbatan qo'llaniladi.",
+                ),
+            ],
+        )
+
+    def analyze_speaking_attempt(
+        self,
+        original_text: str,
+        spoken_text: str,
+        cefr_level: str = "B1",
+    ) -> AnalyzeSpeakingAttemptResponse:
+        """Fast, token-based speech accuracy comparison with Uzbek actionable coaching."""
+        import difflib
+
+        def clean_tokens(text: str) -> List[str]:
+            cleaned = re.sub(r"[^\w\s]", "", text.lower())
+            return cleaned.split()
+
+        orig_raw = original_text.split()
+        orig_clean = clean_tokens(original_text)
+        spoken_clean = clean_tokens(spoken_text)
+
+        matcher = difflib.SequenceMatcher(None, orig_clean, spoken_clean)
+        matches = matcher.get_matching_blocks()
+
+        matched_orig_indices = set()
+        for m in matches:
+            for idx in range(m.a, m.a + m.size):
+                matched_orig_indices.add(idx)
+
+        word_comparisons: List[WordComparisonItem] = []
+        correct_count = 0.0
+        missed_words: List[str] = []
+
+        for i, word in enumerate(orig_raw):
+            clean_w = re.sub(r"[^\w]", "", word.lower())
+            if i in matched_orig_indices:
+                word_comparisons.append(WordComparisonItem(word=word, status="correct"))
+                correct_count += 1.0
+            else:
+                spoken_candidate = spoken_clean[i] if i < len(spoken_clean) else None
+                if (
+                    spoken_candidate
+                    and difflib.SequenceMatcher(None, clean_w, spoken_candidate).ratio() > 0.6
+                ):
+                    word_comparisons.append(
+                        WordComparisonItem(
+                            word=word, status="mispronounced", spoken_word=spoken_candidate
+                        )
+                    )
+                    correct_count += 0.5
+                else:
+                    word_comparisons.append(WordComparisonItem(word=word, status="missed"))
+                    missed_words.append(clean_w)
+
+        total = max(len(orig_raw), 1)
+        accuracy = round(min(max((correct_count / total) * 100, 0.0), 100.0), 1)
+
+        if accuracy >= 90:
+            feedback_uz = "Ajoyib talaffuz! 🌟 Nutqingiz deyarli nuqsonsiz va juda ravon chiqdi."
+        elif accuracy >= 75:
+            feedback_uz = "Yaxshi natija! 👍 Aksariyat so'zlarni to'g'ri aytdingiz. Qolgan so'zlarga bir oz e'tibor qarating."
+        elif accuracy >= 50:
+            feedback_uz = "Qoniqarli urinish! 💡 Gapni qaytadan audio orqali eshitib, yana bir bor takrorlab ko'ring."
+        else:
+            feedback_uz = "Mashq qilishda davom eting! 🎯 Avval sekin tezlikda (0.75x) eshiting va so'zlarni aniqroq ayting."
+
+        suggestions: List[str] = []
+        if missed_words:
+            unique_missed = list(dict.fromkeys(missed_words))[:3]
+            for w in unique_missed:
+                if len(w) >= 3:
+                    suggestions.append(f"'{w}' so'zini aniqroq talaffuz qilib ko'ring.")
+
+        return AnalyzeSpeakingAttemptResponse(
+            accuracy_score=accuracy,
+            feedback_uz=feedback_uz,
+            word_comparisons=word_comparisons,
+            suggestions=suggestions,
+        )
+
 
 ai_service = AIService()
+

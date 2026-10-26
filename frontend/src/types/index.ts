@@ -263,3 +263,50 @@ export interface LevelAssessment {
   milestones?: CefrMilestone[];
   forecast_summary?: string;
 }
+
+// --- Speaking Coach Interfaces ---
+export interface SpeakingSentenceItem {
+  id: number;
+  text_en: string;
+  text_uz: string;
+  phonetic_tips?: string;
+  target_words: string[];
+}
+
+export interface VocabularyHighlightItem {
+  word: string;
+  translation_uz: string;
+  pronunciation?: string;
+  tip?: string;
+}
+
+export interface SpeakingSessionResponse {
+  topic: string;
+  cefr_level: string;
+  title: string;
+  overview_uz: string;
+  full_text_en: string;
+  sentences: SpeakingSentenceItem[];
+  vocabulary_highlights: VocabularyHighlightItem[];
+}
+
+export interface SpeakingPresetTopic {
+  id: string;
+  title: string;
+  prompt: string;
+  recommended_level: string;
+  icon: string;
+}
+
+export interface WordComparisonItem {
+  word: string;
+  status: 'correct' | 'mispronounced' | 'missed';
+  spoken_word?: string;
+}
+
+export interface AnalyzeSpeakingResponse {
+  accuracy_score: number;
+  feedback_uz: string;
+  word_comparisons: WordComparisonItem[];
+  suggestions: string[];
+}

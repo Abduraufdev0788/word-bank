@@ -9,6 +9,7 @@ import { Batches } from './pages/Batches';
 import { WordBank } from './pages/WordBank';
 import { MiniStories } from './pages/MiniStories';
 import { WeakWords } from './pages/WeakWords';
+import { SpeakingCoach } from './pages/SpeakingCoach';
 import { Settings } from './pages/Settings';
 import { Auth } from './pages/Auth';
 import { AddWordModal } from './components/modals/AddWordModal';
@@ -96,6 +97,11 @@ const MainApp: React.FC = () => {
         return { title: 'AI Mini Hikoyalar', subtitle: 'Google Gemini orqali kontekstual o\'qish' };
       case 'weak':
         return { title: "Zaif So'zlar Laboratoriyasi", subtitle: 'Eng ko\'p adashilgan so\'zlar tahlili' };
+      case 'speaking':
+        return {
+          title: 'AI Speaking & Talaffuz Murabbiyi',
+          subtitle: 'Mavzular asosida real vaqtda ovozli mashq qilish',
+        };
       case 'settings':
         return { title: 'Sozlamalar & Telegram Bot', subtitle: 'Shaxsiy parametrlar va hisobni ulash' };
       default:
@@ -146,11 +152,16 @@ const MainApp: React.FC = () => {
               onNavigateToStories={() => handleSelectTab('stories')}
               onNavigateToMasteredWords={() => handleSelectTab('mastered')}
               onNavigateToWords={() => handleSelectTab('words')}
+              onNavigateToSpeaking={() => handleSelectTab('speaking')}
             />
           )}
 
           {currentTab === 'review' && (
             <DailyReview onBackToDashboard={() => handleSelectTab('dashboard')} />
+          )}
+
+          {currentTab === 'speaking' && (
+            <SpeakingCoach onBackToDashboard={() => handleSelectTab('dashboard')} />
           )}
 
           {currentTab === 'batches' && (

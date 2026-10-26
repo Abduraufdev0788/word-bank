@@ -14,6 +14,9 @@ import {
   WordEnrichmentResult,
   LevelAssessment,
   ActivityHeatmapData,
+  SpeakingSessionResponse,
+  SpeakingPresetTopic,
+  AnalyzeSpeakingResponse,
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -339,6 +342,34 @@ class ApiClient {
   async unlinkTelegram(): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>('/telegram/unlink', {
       method: 'POST',
+    });
+  }
+
+  // --- Speaking Coach ---
+  async getSpeakingTopics(): Promise<SpeakingPresetTopic[]> {
+    return this.request<SpeakingPresetTopic[]>('/speaking/topics');
+  }
+
+  async generateSpeakingSession(payload: {
+    topic: string;
+    cefr_level?: string;
+    include_user_words?: boolean;
+    sentence_count?: number;
+  }): Promise<SpeakingSessionResponse> {
+    return this.request<SpeakingSessionResponse>('/speaking/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async analyzeSpeakingAttempt(payload: {
+    original_text: string;
+    spoken_text: string;
+    cefr_level?: string;
+  }): Promise<AnalyzeSpeakingResponse> {
+    return this.request<AnalyzeSpeakingResponse>('/speaking/analyze', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 }

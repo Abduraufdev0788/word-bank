@@ -13,6 +13,7 @@ import {
   PlusCircle,
   BrainCircuit,
   CheckCircle2,
+  Mic,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStudyTime } from '../../context/StudyTimeContext';
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: dueCount > 0 ? dueCount : undefined,
       badgeColor: 'bg-brand-500 text-white',
     },
+    { id: 'speaking', label: 'AI Speaking & Talaffuz', icon: Mic },
     { id: 'batches', label: "To'plamlar (20 talik)", icon: Layers },
     { id: 'words', label: "So'zlar Banki", icon: BookOpen },
     { id: 'mastered', label: "O'zlashtirilgan So'zlar", icon: CheckCircle2 },

@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     translations,
     users,
     vocabulary,
+    speaking,
 )
 
 api_router = APIRouter()
@@ -28,6 +29,7 @@ api_router.include_router(translations.router, prefix="/translations", tags=["AI
 api_router.include_router(stories.router, prefix="/stories", tags=["AI Mini Hikoyalar"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["Telegram Bot Integratsiyasi"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analitika va Boshqaruv paneli"])
+api_router.include_router(speaking.router, prefix="/speaking", tags=["AI Speaking & Talaffuz Murabbiyi"])
 
 
 
