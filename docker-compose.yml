@@ -32,7 +32,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-smartvocab_user}:${POSTGRES_PASSWORD:-smartvocab_secret_pass}@db:5432/${POSTGRES_DB:-smartvocab_db}
     volumes:
       - ./backend:/app
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: ./entrypoint.sh
     ports:
       - "8000:8000"
     networks:

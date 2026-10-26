@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 COPY .env.example .env.example
 
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+CMD ["./entrypoint.sh"]

@@ -3,6 +3,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.api_client import api_client
+from bot.config import bot_settings
 from bot.keyboards import main_menu_keyboard
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"⚠️ **Hisobingiz hali platformaga ulanmagan.**\n\n"
             f"Botdan to'liq foydalanish uchun saytimizdagi hisobingizni bog'lashingiz kerak:\n"
             f"1. Veb-saytimizga kiring:\n"
-            f"   🌐 **Server manzili:** http://10.173.94.72\n"
+            f"   🌐 **Server manzili:** {bot_settings.APP_URL}\n"
             f"   🌐 **Lokal manzil:** http://localhost:5173\n"
             f"2. Profilingizdan **'Telegramni ulash'** tugmasini bosing.\n"
             f"3. Berilgan maxsus havola orqali botga kiring."
@@ -116,7 +117,7 @@ async def website_info_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     text = (
         "🌐 **SmartVocab AI Veb-Platformasi**\n\n"
         "Platformaga kirish uchun quyidagi manzillardan foydalanishingiz mumkin:\n"
-        "🔗 **Server:** http://10.173.94.72\n"
+        f"🔗 **Server:** {bot_settings.APP_URL}\n"
         "🔗 **Lokal:** http://localhost:5173\n\n"
         "💡 **Hisobni ulash tartibi:**\n"
         "1. Saytga kiring va ro'yxatdan o'ting / hisobingizga kiring.\n"
