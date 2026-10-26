@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 from bot.config import bot_settings
-from bot.handlers.start import start_command, help_command
+from bot.handlers.start import start_command, help_command, website_info_handler
 from bot.handlers.review import start_review, handle_reveal_card, handle_rate_card
 from bot.handlers.quiz import start_quiz, handle_quiz_answer
 from bot.handlers.weak import weak_words_command
@@ -34,6 +34,17 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Exception while handling an update:", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "⚠️ Kutilmagan xatolik yuz berdi. Iltimos, /help buyrug'ini bering yoki birozdan so'ng qayta urinib ko'ring."
+            )
+        except Exception:
+            pass
 
 
 async def post_init(application: Application) -> None:
@@ -123,6 +134,7 @@ def build_bot_application() -> Application:
     app.add_handler(CallbackQueryHandler(settings_command, pattern="^cmd_settings$"))
     app.add_handler(CallbackQueryHandler(main_menu_callback, pattern="^cmd_menu$"))
     app.add_handler(CallbackQueryHandler(help_command, pattern="^help_link$"))
+    app.add_handler(CallbackQueryHandler(website_info_handler, pattern="^cmd_website$"))
 
     # Flashcard review callbacks
     app.add_handler(CallbackQueryHandler(handle_reveal_card, pattern="^reveal_"))
@@ -146,6 +158,9 @@ def build_bot_application() -> Application:
 
     # Smart Text Message Handler (auto-translate & 1-click word add)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_message))
+
+    # Global Error Handler
+    app.add_error_handler(error_handler)
 
     return app
 

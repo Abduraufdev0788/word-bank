@@ -82,11 +82,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"👋 **Assalomu alaykum, {user.first_name}!**\n\n"
             f"**SmartVocab AI** — bu Google Gemini bilan boyitilgan, aqlli interval takrorlash (SRS) "
             f"va shaxsiy lug'at platformangizning rasmiy Telegram boti.\n\n"
-            f"⚠️ **Hisobingiz hali platformaga ulanmagan.**\n"
+            f"⚠️ **Hisobingiz hali platformaga ulanmagan.**\n\n"
             f"Botdan to'liq foydalanish uchun saytimizdagi hisobingizni bog'lashingiz kerak:\n"
-            f"1. Veb-saytimizga kiring.\n"
-            f"2. Sozlamalar yoki Profil bo'limidan **'Telegramni ulash'** tugmasini bosing.\n"
-            f"3. Berilgan havola orqali botga qaytib kiring."
+            f"1. Veb-saytimizga kiring:\n"
+            f"   🌐 **Server manzili:** http://10.173.94.72\n"
+            f"   🌐 **Lokal manzil:** http://localhost:5173\n"
+            f"2. Profilingizdan **'Telegramni ulash'** tugmasini bosing.\n"
+            f"3. Berilgan maxsus havola orqali botga kiring."
         )
         await update.message.reply_text(
             text,
@@ -95,13 +97,36 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
+async def website_info_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    if update.callback_query:
+        await update.callback_query.answer()
+
+    text = (
+        "🌐 **SmartVocab AI Veb-Platformasi**\n\n"
+        "Platformaga kirish uchun quyidagi manzillardan foydalanishingiz mumkin:\n"
+        "🔗 **Server:** http://10.173.94.72\n"
+        "🔗 **Lokal:** http://localhost:5173\n\n"
+        "💡 **Hisobni ulash tartibi:**\n"
+        "1. Saytga kiring va ro'yxatdan o'ting / hisobingizga kiring.\n"
+        "2. Sozlamalar yoki Profil bo'limidan **'Telegramni ulash'** tugmasini bosing.\n"
+        "3. Chiqqan havola orqali botga o'tsangiz, profilingiz avtomatik ulanadi."
+    )
+    if msg:
+        await msg.reply_text(text, parse_mode="Markdown")
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         f"📖 **SmartVocab AI Bot Buyruqlari:**\n\n"
         f"🔄 `/review` — Bugun takrorlanishi lozim bo'lgan so'zlarni mashq qilish\n"
+        f"🎯 `/quiz` — 4 talik interaktiv viktorina (test)\n"
         f"➕ `/add <so'z>` — Lug'atga yangi inglizcha so'z qo'shish (AI avtomatik boyitadi)\n"
         f"🔤 `/translate <matn>` — AI yordamida tezkor tarjima olish\n"
         f"📦 `/batches` — 20 talik to'plamlaringiz holatini ko'rish\n"
+        f"⚠️ `/weak` — Zaif so'zlar bo'yicha mashq\n"
+        f"📖 `/stories` — CEFR darajangizga mos AI mini hikoyalar\n"
+        f"🌟 `/word` — Kunning maxsus so'zi\n"
         f"📊 `/progress` — Kunlik natijalar, o'rganilgan so'zlar va seriya (streak)\n"
         f"⚙️ `/settings` — Hisob ma'lumotlari va sozlamalar\n"
         f"ℹ️ `/help` — Yordam va qo'llanma"
@@ -111,3 +136,4 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(text, parse_mode="Markdown")
+

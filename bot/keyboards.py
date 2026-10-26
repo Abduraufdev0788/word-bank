@@ -5,7 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 def main_menu_keyboard(is_linked: bool = True) -> InlineKeyboardMarkup:
     if not is_linked:
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌐 Saytga o'tish", url="http://localhost:5173")],
+            [InlineKeyboardButton("🌐 Veb-sayt manzili", callback_data="cmd_website")],
             [InlineKeyboardButton("ℹ️ Qanday ulanadi?", callback_data="help_link")],
         ])
 
@@ -28,7 +28,7 @@ def main_menu_keyboard(is_linked: bool = True) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("⚙️ Sozlamalar", callback_data="cmd_settings"),
-            InlineKeyboardButton("🌐 Veb-sayt", url="http://localhost:5173"),
+            InlineKeyboardButton("🌐 Veb-sayt manzili", callback_data="cmd_website"),
         ],
     ])
 
