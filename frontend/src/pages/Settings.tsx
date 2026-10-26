@@ -23,8 +23,9 @@ export const Settings: React.FC = () => {
 
   // Telegram link token
   const [telegramToken, setTelegramToken] = useState<string | null>(null);
-  const [botUsername, setBotUsername] = useState<string>('smartvocab_bot');
+  const [botUsername, setBotUsername] = useState<string>('english_learn_daily_robot');
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleSavePreferences = async (e: React.FormEvent) => {
@@ -63,10 +64,43 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleUnlinkTelegram = async () => {
+    if (!window.confirm("Haqiqatan ham Telegram hisobini platformadan uzmoqchimisiz?")) {
+      return;
+    }
+    setUnlinking(true);
+    try {
+      await api.unlinkTelegram();
+      await refreshUser();
+      setTelegramToken(null);
+    } catch (err: any) {
+      alert("Telegram hisobini uzishda xatolik: " + (err.message || "Noma'lum xatolik"));
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("Nusxa olishda xatolik:", err);
+    }
   };
 
   return (
@@ -171,13 +205,26 @@ export const Settings: React.FC = () => {
             </p>
 
             {user?.is_telegram_linked || user?.telegram_username ? (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <Check className="w-4 h-4" /> Telegram hisobingiz ulangan!
-                </p>
-                <p className="text-[11px] text-slate-300">
-                  Foydalanuvchi: <strong>@{user?.telegram_username || 'Ulangan'}</strong>
-                </p>
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-3">
+                <div className="space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Check className="w-4 h-4" /> Telegram hisobingiz ulangan!
+                  </p>
+                  <p className="text-[11px] text-slate-300">
+                    Foydalanuvchi: <strong>@{user?.telegram_username || 'Ulangan'}</strong>
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-emerald-500/20 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Hisobni almashtirish yoki qayta ulash:</span>
+                  <button
+                    type="button"
+                    disabled={unlinking}
+                    onClick={handleUnlinkTelegram}
+                    className="py-1 px-2.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[11px] font-semibold border border-red-500/30 transition-all disabled:opacity-50"
+                  >
+                    {unlinking ? "Uzilmoqda..." : "Ulanishni uzish"}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">

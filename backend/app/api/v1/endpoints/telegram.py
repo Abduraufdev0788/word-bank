@@ -540,6 +540,29 @@ async def unlink_telegram_account(
     return {"success": True, "message": "Telegram hisobi muvaffaqiyatli uzildi."}
 
 
+@router.post(
+    "/unlink",
+    status_code=status.HTTP_200_OK,
+    summary="Web foydalanuvchining o'z Telegram hisobini uzish",
+)
+@router.delete(
+    "/unlink",
+    status_code=status.HTTP_200_OK,
+    summary="Web foydalanuvchining o'z Telegram hisobini uzish (DELETE)",
+)
+async def unlink_my_telegram_account(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(TelegramAccount).where(TelegramAccount.user_id == current_user.id)
+    result = await db.execute(stmt)
+    accounts = result.scalars().all()
+    for acc in accounts:
+        await db.delete(acc)
+    await db.commit()
+    return {"success": True, "message": "Telegram hisobi muvaffaqiyatli uzildi."}
+
+
 # --- 8. Weak Words Review ---
 
 @router.get(

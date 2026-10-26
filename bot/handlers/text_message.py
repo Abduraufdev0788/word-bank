@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 async def handle_user_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not user or not update.message or not update.message.text:
+    chat = update.effective_chat
+    if not user or not chat or not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()

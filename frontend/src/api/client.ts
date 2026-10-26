@@ -335,6 +335,12 @@ class ApiClient {
       expires_in_seconds?: number;
     }>('/telegram/link-token', { method: 'POST' });
   }
+
+  async unlinkTelegram(): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>('/telegram/unlink', {
+      method: 'POST',
+    });
+  }
 }
 
 export const api = new ApiClient();
