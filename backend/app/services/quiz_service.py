@@ -189,11 +189,13 @@ async def finalize_quiz_attempt(
         DailyActivity.activity_date == today,
     )
     activity = (await db.execute(act_stmt)).scalar_one_or_none()
+    quiz_active_seconds = max(30, (attempt.total_questions or 1) * 15)
+
     if not activity:
         activity = DailyActivity(
             user_id=user_id,
             activity_date=today,
-            total_active_seconds=0,
+            total_active_seconds=quiz_active_seconds,
             words_learned=0,
             words_reviewed=0,
             quizzes_taken=1,
@@ -202,6 +204,7 @@ async def finalize_quiz_attempt(
         db.add(activity)
     else:
         activity.quizzes_taken += 1
+        activity.total_active_seconds += quiz_active_seconds
 
     await db.commit()
     await db.refresh(attempt)

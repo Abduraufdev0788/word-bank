@@ -96,7 +96,6 @@ class AnalyticsService:
             DailyActivity.user_id == user_id
         )
         total_active_seconds_all = (await db.execute(total_time_stmt)).scalar() or 0
-        total_study_time_minutes = total_active_seconds_all // 60
 
         # 3. Overall review accuracy
         acc_stmt = select(
@@ -107,6 +106,8 @@ class AnalyticsService:
         overall_accuracy_percent = (
             round((total_correct / total_revs) * 100.0, 1) if total_revs and total_revs > 0 else 100.0
         )
+        total_active_seconds_all = max(total_active_seconds_all, total_revs * 20)
+        total_study_time_minutes = total_active_seconds_all // 60
 
         # 4. Today's DailyActivity & Streak
         today_act_stmt = select(DailyActivity).where(
@@ -115,9 +116,18 @@ class AnalyticsService:
         )
         today_act = (await db.execute(today_act_stmt)).scalars().first()
 
+        today_revs_stmt = select(func.count(WordReview.id)).where(
+            WordReview.user_id == user_id,
+            WordReview.created_at >= today_start,
+        )
+        today_reviews_count = (await db.execute(today_revs_stmt)).scalar() or 0
+
         words_learned_today = today_act.words_learned if today_act else 0
-        words_reviewed_today = today_act.words_reviewed if today_act else 0
-        today_study_time_seconds = today_act.total_active_seconds if today_act else 0
+        words_reviewed_today = max(today_act.words_reviewed if today_act else 0, today_reviews_count)
+        today_study_time_seconds = max(
+            today_act.total_active_seconds if today_act else 0,
+            today_reviews_count * 20,
+        )
         today_study_time_minutes = today_study_time_seconds // 60
 
         streak_days = 0
@@ -158,6 +168,8 @@ class AnalyticsService:
 
         # 6. Weekly chart (last 7 days)
         seven_days_ago = today - timedelta(days=6)
+        seven_days_start = datetime.combine(seven_days_ago, time.min).replace(tzinfo=timezone.utc)
+
         week_stmt = select(DailyActivity).where(
             DailyActivity.user_id == user_id,
             DailyActivity.activity_date >= seven_days_ago,
@@ -166,17 +178,40 @@ class AnalyticsService:
         week_acts = (await db.execute(week_stmt)).scalars().all()
         week_map = {act.activity_date: act for act in week_acts}
 
+        week_rev_stmt = (
+            select(
+                func.date(WordReview.created_at).label("rev_date"),
+                func.count(WordReview.id).label("rev_count"),
+                func.sum(case((WordReview.is_correct == True, 1), else_=0)).label("correct_count"),  # noqa: E712
+            )
+            .where(
+                WordReview.user_id == user_id,
+                WordReview.created_at >= seven_days_start,
+            )
+            .group_by(func.date(WordReview.created_at))
+        )
+        week_rev_rows = (await db.execute(week_rev_stmt)).all()
+        rev_by_date = {str(r.rev_date): (r.rev_count, r.correct_count) for r in week_rev_rows}
+
         weekly_chart = []
         for i in range(7):
             d = seven_days_ago + timedelta(days=i)
             day_name = UZBEK_DAY_NAMES[d.weekday()]
+            d_str = d.isoformat()
             act = week_map.get(d)
+            rev_count, correct_count = rev_by_date.get(d_str, (0, 0))
+
+            words_reviewed = max(act.words_reviewed if act else 0, rev_count)
+            words_learned = max(act.words_learned if act else 0, correct_count or 0)
+            active_seconds = max(act.total_active_seconds if act else 0, words_reviewed * 20)
+            active_minutes = max(active_seconds // 60, (1 if words_reviewed > 0 else 0))
+
             point = DailyActivityChartPoint(
-                date=d.isoformat(),
+                date=d_str,
                 day_name=day_name,
-                active_minutes=(act.total_active_seconds // 60) if act else 0,
-                words_learned=act.words_learned if act else 0,
-                words_reviewed=act.words_reviewed if act else 0,
+                active_minutes=active_minutes,
+                words_learned=words_learned,
+                words_reviewed=words_reviewed,
             )
             weekly_chart.append(point)
 

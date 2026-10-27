@@ -1,11 +1,11 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.learning import DailyActivity, StudySession
+from app.models.learning import DailyActivity, StudySession, WordReview
 
 
 def utc_now() -> datetime:
@@ -28,6 +28,7 @@ async def start_study_session(
 ) -> StudySession:
     """Starts a new study session and cleans up stale unclosed sessions."""
     now = utc_now()
+    today = now.date()
 
     # Close any stale active sessions
     stale_cutoff = now - timedelta(minutes=settings.STUDY_SESSION_IDLE_TIMEOUT_MINUTES * 2)
@@ -51,6 +52,25 @@ async def start_study_session(
         is_active=True,
     )
     db.add(new_session)
+
+    # Ensure today's DailyActivity row exists
+    act_stmt = select(DailyActivity).where(
+        DailyActivity.user_id == user_id,
+        DailyActivity.activity_date == today,
+    )
+    activity = (await db.execute(act_stmt)).scalar_one_or_none()
+    if not activity:
+        activity = DailyActivity(
+            user_id=user_id,
+            activity_date=today,
+            total_active_seconds=0,
+            words_learned=0,
+            words_reviewed=0,
+            quizzes_taken=0,
+            streak_day_count=1,
+        )
+        db.add(activity)
+
     await db.commit()
     await db.refresh(new_session)
     return new_session
@@ -172,7 +192,9 @@ async def get_study_time_summary(
     """Calculates today's, 7-day, and total accumulated active study time."""
     now = utc_now()
     today = now.date()
+    today_start = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
     seven_days_ago = today - timedelta(days=7)
+    seven_days_start = datetime.combine(seven_days_ago, time.min).replace(tzinfo=timezone.utc)
 
     # Today's active seconds
     today_stmt = select(func.coalesce(func.sum(DailyActivity.total_active_seconds), 0)).where(
@@ -181,6 +203,14 @@ async def get_study_time_summary(
     )
     today_seconds = (await db.execute(today_stmt)).scalar() or 0
 
+    # Ensure today's reviews are counted (at least 20s per review card)
+    today_revs_stmt = select(func.count(WordReview.id)).where(
+        WordReview.user_id == user_id,
+        WordReview.created_at >= today_start,
+    )
+    today_revs = (await db.execute(today_revs_stmt)).scalar() or 0
+    today_seconds = max(int(today_seconds), today_revs * 20)
+
     # 7-day active seconds
     week_stmt = select(func.coalesce(func.sum(DailyActivity.total_active_seconds), 0)).where(
         DailyActivity.user_id == user_id,
@@ -188,11 +218,24 @@ async def get_study_time_summary(
     )
     week_seconds = (await db.execute(week_stmt)).scalar() or 0
 
+    week_revs_stmt = select(func.count(WordReview.id)).where(
+        WordReview.user_id == user_id,
+        WordReview.created_at >= seven_days_start,
+    )
+    week_revs = (await db.execute(week_revs_stmt)).scalar() or 0
+    week_seconds = max(int(week_seconds), week_revs * 20)
+
     # Total all-time active seconds
     total_stmt = select(func.coalesce(func.sum(DailyActivity.total_active_seconds), 0)).where(
         DailyActivity.user_id == user_id,
     )
     total_seconds = (await db.execute(total_stmt)).scalar() or 0
+
+    total_revs_stmt = select(func.count(WordReview.id)).where(
+        WordReview.user_id == user_id,
+    )
+    total_revs = (await db.execute(total_revs_stmt)).scalar() or 0
+    total_seconds = max(int(total_seconds), total_revs * 20)
 
     return {
         "today_active_seconds": int(today_seconds),

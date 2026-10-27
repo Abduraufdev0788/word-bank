@@ -121,12 +121,15 @@ async def process_word_review(
         DailyActivity.activity_date == today,
     )
     activity = (await db.execute(act_stmt)).scalar_one_or_none()
+    active_seconds_gained = max(15, min(int((time_spent_ms or 15000) / 1000), 60))
+    newly_learned = 1 if (is_correct and progress.times_correct == 1) else 0
+
     if not activity:
         activity = DailyActivity(
             user_id=user_id,
             activity_date=today,
-            total_active_seconds=0,
-            words_learned=0,
+            total_active_seconds=active_seconds_gained,
+            words_learned=newly_learned,
             words_reviewed=1,
             quizzes_taken=0,
             streak_day_count=1,
@@ -134,6 +137,9 @@ async def process_word_review(
         db.add(activity)
     else:
         activity.words_reviewed += 1
+        activity.total_active_seconds += active_seconds_gained
+        if newly_learned:
+            activity.words_learned += newly_learned
 
     await db.commit()
     await db.refresh(progress)

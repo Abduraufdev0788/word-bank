@@ -16,6 +16,12 @@ import {
   Cpu,
   Compass,
   HelpCircle,
+  Copy,
+  Check,
+  ShieldAlert,
+  Keyboard,
+  X,
+  ArrowLeft,
 } from 'lucide-react';
 import { api } from '../api/client';
 import {
@@ -29,9 +35,16 @@ interface SpeakingCoachProps {
   onBackToDashboard?: () => void;
 }
 
-export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
+export const SpeakingCoach: React.FC<SpeakingCoachProps> = ({ onBackToDashboard }) => {
   // Navigation / Phase
   const [phase, setPhase] = useState<'setup' | 'practicing' | 'summary'>('setup');
+
+  // Input Mode & Microphone Help State
+  const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
+  const [manualSpokenInput, setManualSpokenInput] = useState<string>('');
+  const [showMicHelpModal, setShowMicHelpModal] = useState<boolean>(false);
+  const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
+  const [micStatus, setMicStatus] = useState<'idle' | 'checking' | 'granted' | 'denied'>('idle');
 
   // Setup options
   const [presetTopics, setPresetTopics] = useState<SpeakingPresetTopic[]>([]);
@@ -145,16 +158,49 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
     window.speechSynthesis.speak(utterance);
   };
 
+  // Check and test microphone permission
+  const checkMicPermission = async () => {
+    setMicStatus('checking');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setMicStatus('denied');
+      setShowMicHelpModal(true);
+      return false;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setMicStatus('granted');
+      return true;
+    } catch (err: any) {
+      console.warn('Microphone permission check failed:', err);
+      setMicStatus('denied');
+      setShowMicHelpModal(true);
+      return false;
+    }
+  };
+
   // Start Speech Recognition
-  const startRecording = () => {
+  const startRecording = async () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert(
-        "Brauzeringizda ovozni aniqlash (SpeechRecognition) qo'llab-quvvatlanmaydi. Google Chrome yoki Microsoft Edge brauzeridan foydalanishni tavsiya qilamiz."
-      );
+      setShowMicHelpModal(true);
       return;
+    }
+
+    // Proactively verify permission if possible
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && micStatus !== 'granted') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        setMicStatus('granted');
+      } catch (err: any) {
+        console.warn('Microphone permission was not granted:', err);
+        setMicStatus('denied');
+        setShowMicHelpModal(true);
+        return;
+      }
     }
 
     try {
@@ -183,8 +229,9 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         setIsRecording(false);
-        if (event.error === 'not-allowed') {
-          alert("Mikrofonga ruxsat berilmagan. Iltimos, brauzer sozlamalarida mikrofonga ruxsat bering.");
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setMicStatus('denied');
+          setShowMicHelpModal(true);
         }
       };
 
@@ -196,6 +243,7 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
     } catch (err) {
       console.error('Error starting recognition:', err);
       setIsRecording(false);
+      setShowMicHelpModal(true);
     }
   };
 
@@ -262,6 +310,7 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
       setSessionResults([]);
       setCurrentAnalysis(null);
       setSpeechTranscript('');
+      setManualSpokenInput('');
       setPhase('practicing');
     } catch (err: any) {
       alert("Mashg'ulot yaratishda xatolik: " + (err.message || "Noma'lum xatolik"));
@@ -277,6 +326,7 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
       setCurrentIndex((prev) => prev + 1);
       setCurrentAnalysis(null);
       setSpeechTranscript('');
+      setManualSpokenInput('');
       window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
     } else {
@@ -316,31 +366,54 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
     <div className="p-3.5 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-dark-800 pb-5">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
-              <Mic className="w-5 h-5" />
-            </span>
-            <span>AI Speaking & Talaffuz Murabbiyi</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Mavzu tanlang, gaplarni tinglang va mikrofon orqali inglizcha nutqingizni real vaqtda rivojlantiring
-          </p>
+        <div className="flex items-center gap-3">
+          {onBackToDashboard && (
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              className="p-2.5 rounded-xl bg-dark-850 hover:bg-dark-800 border border-dark-750 text-slate-300 hover:text-white transition-all shadow-sm shrink-0"
+              title="Bosh sahifaga qaytish"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                <Mic className="w-5 h-5" />
+              </span>
+              <span>AI Speaking & Talaffuz Murabbiyi</span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Mavzu tanlang, gaplarni tinglang va mikrofon yoki yozma rejim orqali nutqingizni rivojlantiring
+            </p>
+          </div>
         </div>
 
-        {phase === 'practicing' && session && (
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
           <button
-            onClick={() => {
-              if (window.confirm("Mashg'ulotni to'xtatib, bosh sahifaga qaytmoqchimisiz?")) {
-                setPhase('setup');
-                window.speechSynthesis.cancel();
-              }
-            }}
-            className="px-3.5 py-1.5 rounded-xl bg-dark-850 hover:bg-dark-800 border border-dark-700 text-xs font-semibold text-slate-300 hover:text-white transition-all self-start sm:self-auto"
+            type="button"
+            onClick={() => setShowMicHelpModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5"
           >
-            Mavzuni o'zgartirish
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Mikrofon yordami</span>
           </button>
-        )}
+
+          {phase === 'practicing' && session && (
+            <button
+              onClick={() => {
+                if (window.confirm("Mashg'ulotni to'xtatib, bosh sahifaga qaytmoqchimisiz?")) {
+                  setPhase('setup');
+                  window.speechSynthesis.cancel();
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-dark-850 hover:bg-dark-800 border border-dark-700 text-xs font-semibold text-slate-300 hover:text-white transition-all"
+            >
+              Mavzuni o'zgartirish
+            </button>
+          )}
+        </div>
       </div>
 
       {/* PHASE 1: SETUP & TOPIC SELECTION */}
@@ -353,14 +426,51 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
               <h2 className="text-base font-bold text-white">1. Mavzu va Parametrlarni Tanlang</h2>
             </div>
 
-            {!recognitionSupported && (
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-2">
-                <HelpCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  Brauzeringizda mikrofondan ovozni aniqlash (Speech Recognition) cheklangan bo'lishi mumkin. Eng to'liq va aniq ishlashi uchun Google Chrome yoki Microsoft Edge brauzeridan foydalanish tavsiya etiladi.
-                </span>
+            {/* Microphone Status & Readiness Helper */}
+            <div className="p-3.5 sm:p-4 rounded-xl bg-dark-850 border border-dark-750 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg border ${
+                  micStatus === 'granted'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-brand-500/10 border-brand-500/30 text-brand-300'
+                }`}>
+                  <Mic className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-white">
+                    {!recognitionSupported
+                      ? "Ovozni aniqlash cheklangan"
+                      : micStatus === 'granted'
+                      ? "Mikrofon ruxsati faol"
+                      : "Mikrofon va ovoz holati"}
+                  </p>
+                  <p className="text-slate-400 text-[11px]">
+                    {!recognitionSupported
+                      ? "Ushbu brauzerda nutqni aniqlash mavjud emas, Yozma rejimdan foydalanishingiz mumkin"
+                      : micStatus === 'granted'
+                      ? "Ovoz orqali gapirib tekshirishga tayyorsiz"
+                      : "Google Chrome yoki Yozma rejim (diktovka) orqali mashq qilishingiz mumkin"}
+                  </p>
+                </div>
               </div>
-            )}
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={checkMicPermission}
+                  className="px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-300 hover:text-white font-medium transition-colors"
+                >
+                  {micStatus === 'checking' ? "Tekshirilmoqda..." : "Mikrofonni sinash"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMicHelpModal(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold transition-colors"
+                >
+                  Yo'riqnoma
+                </button>
+              </div>
+            </div>
 
             {/* Ready Preset Topics */}
             <div className="space-y-3">
@@ -555,7 +665,7 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
                   </div>
                 )}
 
-                {/* Controls: Listen (TTS) & Record (STT) */}
+                {/* Controls: Listen (TTS) & Mode Switch (Voice / Text) */}
                 <div className="pt-4 border-t border-dark-800 flex flex-wrap items-center justify-between gap-4">
                   {/* TTS Audio Listen Controls */}
                   <div className="flex items-center gap-2">
@@ -583,30 +693,102 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
                     </button>
                   </div>
 
-                  {/* Speech Recording Button */}
-                  <div className="flex items-center gap-3">
-                    {isRecording ? (
+                  {/* Mode switcher and Voice button */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center p-1 bg-dark-850 rounded-xl border border-dark-750 text-xs">
                       <button
                         type="button"
-                        onClick={stopRecording}
-                        className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-2 animate-pulse shadow-lg shadow-rose-900/40"
+                        onClick={() => setInputMode('voice')}
+                        className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+                          inputMode === 'voice'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
                       >
-                        <MicOff className="w-4 h-4" />
-                        <span>To'xtatish (Yakunlash)</span>
+                        <Mic className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Mikrofon</span>
                       </button>
-                    ) : (
                       <button
                         type="button"
-                        onClick={startRecording}
-                        disabled={isPlayingAudio}
-                        className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/30"
+                        onClick={() => setInputMode('text')}
+                        className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+                          inputMode === 'text'
+                            ? 'bg-brand-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
                       >
-                        <Mic className="w-4 h-4" />
-                        <span>🎙 Gapirishni boshlash</span>
+                        <Keyboard className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Yozma / Diktovka</span>
                       </button>
+                    </div>
+
+                    {inputMode === 'voice' && (
+                      isRecording ? (
+                        <button
+                          type="button"
+                          onClick={stopRecording}
+                          className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-2 animate-pulse shadow-lg shadow-rose-900/40"
+                        >
+                          <MicOff className="w-4 h-4" />
+                          <span>To'xtatish</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          disabled={isPlayingAudio}
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/30"
+                        >
+                          <Mic className="w-4 h-4" />
+                          <span>🎙 Gapirish</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
+
+                {/* Text / Keyboard Dictation Fallback Mode */}
+                {inputMode === 'text' && (
+                  <div className="p-4 rounded-xl bg-dark-850 border border-dark-700 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                        <Keyboard className="w-4 h-4 text-brand-400" />
+                        <span>Aytgan gapingizni yozing yoki klaviatura mikrofonidan foydalaning:</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowMicHelpModal(true)}
+                        className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        <span>Mikrofon yo'riqnomasi</span>
+                      </button>
+                    </div>
+
+                    <textarea
+                      value={manualSpokenInput}
+                      onChange={(e) => setManualSpokenInput(e.target.value)}
+                      placeholder="Masalan: The weather is warm and sunny today..."
+                      rows={2}
+                      className="w-full px-3.5 py-2.5 bg-dark-900 border border-dark-700 rounded-xl text-white text-sm focus:border-brand-500 focus:outline-none resize-none font-medium"
+                    />
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                      <p className="text-[11px] text-slate-400">
+                        Maslahat: Telefon klaviaturasidagi 🎙 tugmasi orqali brauzer ruxsatisiz ham ovoz bilan yozishingiz mumkin.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={evaluating || !manualSpokenInput.trim()}
+                        onClick={() => handleEvaluate(manualSpokenInput)}
+                        className="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shrink-0"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{evaluating ? "Baholanmoqda..." : "AI Baholasin"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Real-time speech transcript box */}
                 {(isRecording || speechTranscript) && (
@@ -834,6 +1016,104 @@ export const SpeakingCoach: React.FC<SpeakingCoachProps> = () => {
               <Sparkles className="w-4 h-4" />
               <span>Yangi mavzu tanlash</span>
             </button>
+          </div>
+        </div>
+      )}
+      {/* Microphone Permission Instructions Modal */}
+      {showMicHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-dark-900 border border-dark-750 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => setShowMicHelpModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                <Mic className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">Mikrofonga Ruxsat Yo'riqnomasi</h3>
+                <p className="text-xs text-slate-400">Brauzeringizda mikrofonni 1 daqiqada yoqish</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-300">
+              <div className="p-3.5 rounded-xl bg-dark-850 border border-dark-750 space-y-1.5">
+                <p className="font-bold text-white flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Nega ruxsat berish talab etiladi?</span>
+                </p>
+                <p className="text-slate-400 leading-relaxed">
+                  Saytga IP-manzil (HTTP) orqali ulanganda, Google Chrome va Edge brauzerlari xavfsizlik siyosatiga ko'ra mikrofonga to'g'ridan-to'g'ri ruxsat bermaydi.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-extrabold text-white text-sm">Chrome brauzerida yoqish bosqichlari:</p>
+                <ol className="list-decimal list-inside space-y-2 text-slate-300 pl-1 leading-relaxed">
+                  <li>
+                    Yangi tabda ushbu manzilni oching:
+                    <div className="mt-1 p-2 rounded-lg bg-dark-950 font-mono text-[11px] text-brand-300 border border-dark-800 select-all">
+                      chrome://flags/#unsafely-treat-insecure-origin-as-secure
+                    </div>
+                  </li>
+                  <li>
+                    Ochilgan sahifadagi qatorga joriy sayt manzilini yozing:
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="flex-1 p-2 rounded-lg bg-dark-950 font-mono text-[11px] text-cyan-300 border border-dark-800 truncate">
+                        {typeof window !== 'undefined' ? window.location.origin : 'http://...'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.origin);
+                          setCopiedUrl(true);
+                          setTimeout(() => setCopiedUrl(false), 2000);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-dark-800 hover:bg-dark-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 border border-dark-700"
+                      >
+                        {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedUrl ? "Nusxalandi!" : "Nusxalash"}</span>
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    O'ng tarafdagi holatni <strong className="text-emerald-400">"Enabled"</strong> qiling va pastdagi <strong className="text-brand-400">"Relaunch"</strong> tugmasini bosing.
+                  </li>
+                </ol>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 space-y-1">
+                <p className="font-bold">Oson muqobil usul:</p>
+                <p className="text-slate-400">
+                  Bayroqni sozlamasdan turib ham, <strong>"Yozma rejim"</strong> orqali gaplarni yozishingiz yoki telefoningiz klaviaturasidagi diktovka mikrofonidan erkin foydalanishingiz mumkin.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setInputMode('text');
+                  setShowMicHelpModal(false);
+                }}
+                className="w-full sm:flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-glow-brand"
+              >
+                <Keyboard className="w-4 h-4" />
+                <span>Yozma rejimga o'tish</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMicHelpModal(false)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-dark-850 hover:bg-dark-750 text-slate-300 text-xs font-semibold"
+              >
+                Yopish
+              </button>
+            </div>
           </div>
         </div>
       )}

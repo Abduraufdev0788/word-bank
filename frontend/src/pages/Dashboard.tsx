@@ -27,6 +27,7 @@ import { DashboardStats, LevelAssessment } from '../types';
 import { LevelGrowthCard } from '../components/analytics/LevelGrowthCard';
 import { ActivityHeatmap } from '../components/analytics/ActivityHeatmap';
 import { MasteredBoosterModal } from '../components/study/MasteredBoosterModal';
+import { useStudyTime } from '../context/StudyTimeContext';
 
 interface DashboardProps {
   onStartReview: () => void;
@@ -51,11 +52,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToWords,
   onNavigateToSpeaking,
 }) => {
+  const { activeSecondsToday, isStudying } = useStudyTime();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [levelAssessment, setLevelAssessment] = useState<LevelAssessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMasteredBoosterOpen, setIsMasteredBoosterOpen] = useState(false);
+  const [chartMetric, setChartMetric] = useState<'words' | 'time'>('words');
 
   const fetchStats = async () => {
     try {
@@ -551,18 +554,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-cyan-500/40 transition-all duration-300 shadow-lg group">
           <div className="flex items-center justify-between text-slate-400 mb-2 sm:mb-3">
             <span className="text-[11px] sm:text-xs font-bold text-slate-300">Bugungi vaqt</span>
-            <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-accent-cyan group-hover:scale-110 transition-transform">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-accent-cyan group-hover:scale-110 transition-transform flex items-center gap-1.5">
+              {isStudying && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Hozir o'rganilmoqda" />
+              )}
               <Clock className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-accent-cyan tracking-tight font-mono">
-            {stats.today_study_time_minutes}{' '}
-            <span className="text-xs sm:text-sm font-sans font-normal text-slate-400">daqiqa</span>
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between font-mono">
-            <span>Jami:</span>
-            <span className="text-slate-300 font-bold">{(stats.total_study_time_minutes / 60).toFixed(1)} soat</span>
-          </p>
+          {(() => {
+            const liveSeconds = Math.max(stats.today_study_time_seconds || 0, activeSecondsToday || 0);
+            const liveMinutes = Math.floor(liveSeconds / 60);
+            const totalHours = ((Math.max(stats.total_study_time_minutes * 60, liveSeconds)) / 3600).toFixed(1);
+
+            return (
+              <>
+                <p className="text-2xl sm:text-3xl font-black text-accent-cyan tracking-tight font-mono">
+                  {liveMinutes > 0 ? (
+                    <>
+                      {liveMinutes}{' '}
+                      <span className="text-xs sm:text-sm font-sans font-normal text-slate-400">daq</span>
+                      {liveSeconds % 60 > 0 && (
+                        <span className="text-xs font-mono font-medium text-cyan-400/80 ml-1.5">
+                          {liveSeconds % 60}s
+                        </span>
+                      )}
+                    </>
+                  ) : liveSeconds > 0 ? (
+                    <>
+                      {liveSeconds}{' '}
+                      <span className="text-xs sm:text-sm font-sans font-normal text-slate-400">soniya</span>
+                    </>
+                  ) : (
+                    <>
+                      0{' '}
+                      <span className="text-xs sm:text-sm font-sans font-normal text-slate-400">daqiqa</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between font-mono">
+                  <span>Jami o'rganilgan:</span>
+                  <span className="text-slate-300 font-bold">{totalHours} soat</span>
+                </p>
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -672,35 +707,91 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Weekly Activity Bar Chart */}
         <div className="lg:col-span-2 p-6 sm:p-7 rounded-3xl bg-dark-900 border border-dark-800/90 shadow-xl space-y-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <TrendingUp className="w-4 h-4 text-brand-400" />
-              <h4 className="text-sm font-extrabold text-white">So'nggi 7 kunlik faoliyat</h4>
+              <div>
+                <h4 className="text-sm font-extrabold text-white">So'nggi 7 kunlik faoliyat</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Jami: <span className="text-emerald-400 font-bold">{weekly_chart.reduce((acc, d) => acc + (d.words_reviewed || 0), 0)} ta so'z</span> takrorlandi • <span className="text-cyan-400 font-bold">{weekly_chart.reduce((acc, d) => acc + (d.active_minutes || 0), 0)} daq</span> faol vaqt
+                </p>
+              </div>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Haqiqiy faol daqiqalar</span>
+
+            {/* Toggle metric switch */}
+            <div className="flex items-center p-1 bg-dark-950 rounded-xl border border-dark-800 text-xs shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setChartMetric('words')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  chartMetric === 'words'
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                So'zlar soni
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMetric('time')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  chartMetric === 'time'
+                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Daqiqalar
+              </button>
+            </div>
           </div>
 
-          <div className="h-48 flex items-end justify-between gap-3 pt-6 pb-2 px-2">
+          <div className="h-52 flex items-end justify-between gap-2 sm:gap-4 pt-6 pb-2 px-1 sm:px-2">
             {weekly_chart.map((day, idx) => {
-              const maxMinutes = Math.max(...weekly_chart.map((d) => d.active_minutes), 30);
-              const heightPercent = Math.min(100, Math.round((day.active_minutes / maxMinutes) * 100));
+              const val = chartMetric === 'words' ? (day.words_reviewed || 0) : (day.active_minutes || 0);
+              const maxVal = Math.max(
+                ...weekly_chart.map((d) => (chartMetric === 'words' ? (d.words_reviewed || 0) : (d.active_minutes || 0))),
+                chartMetric === 'words' ? 20 : 15
+              );
+              const heightPercent = val > 0 ? Math.min(100, Math.max(16, Math.round((val / maxVal) * 100))) : 8;
 
               return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="text-[10px] text-slate-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                    {day.active_minutes}m
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
+                  {/* Top value badge */}
+                  <div
+                    className={`text-[11px] font-black font-mono transition-all ${
+                      val > 0
+                        ? chartMetric === 'words'
+                          ? 'text-brand-300'
+                          : 'text-cyan-300'
+                        : 'text-slate-500 opacity-60'
+                    }`}
+                  >
+                    {val > 0 ? (chartMetric === 'words' ? `${val}` : `${val}m`) : '-'}
                   </div>
-                  <div className="w-full bg-dark-950/80 rounded-xl h-32 flex items-end overflow-hidden p-0.5 border border-dark-800">
+
+                  {/* Bar container */}
+                  <div className="w-full bg-dark-950/80 rounded-xl h-32 flex items-end overflow-hidden p-1 border border-dark-800/80 group-hover:border-dark-700 transition-colors">
                     <div
-                      style={{ height: `${Math.max(8, heightPercent)}%` }}
+                      style={{ height: `${heightPercent}%` }}
                       className={`w-full rounded-lg transition-all duration-500 ${
-                        day.active_minutes > 0
-                          ? 'bg-gradient-to-t from-brand-600 via-accent-violet to-cyan-400 group-hover:brightness-110 shadow-sm'
-                          : 'bg-dark-800'
+                        val > 0
+                          ? chartMetric === 'words'
+                            ? 'bg-gradient-to-t from-brand-600 via-accent-violet to-emerald-400 shadow-glow-violet group-hover:brightness-110'
+                            : 'bg-gradient-to-t from-cyan-600 via-cyan-400 to-sky-300 shadow-glow-cyan group-hover:brightness-110'
+                          : 'bg-dark-800/60'
                       }`}
                     />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-400">{day.day_name}</span>
+
+                  {/* Day Label */}
+                  <span className="text-[11px] font-bold text-slate-400 group-hover:text-white transition-colors">
+                    {day.day_name}
+                  </span>
+
+                  {/* Detailed Tooltip on hover */}
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-dark-950 text-white text-[10px] py-1.5 px-2.5 rounded-lg border border-dark-700 shadow-2xl whitespace-nowrap z-20">
+                    <span className="font-bold text-slate-200">{day.day_name}:</span> {day.words_reviewed} ta so'z • {day.active_minutes} daq
+                  </div>
                 </div>
               );
             })}
