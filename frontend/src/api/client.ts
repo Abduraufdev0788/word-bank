@@ -167,10 +167,11 @@ class ApiClient {
     });
   }
 
-  async updateBatch(batchId: string, title: string): Promise<WordBatch> {
+  async updateBatch(batchId: string, data: { title?: string; is_complete?: boolean } | string): Promise<WordBatch> {
+    const payload = typeof data === 'string' ? { title: data } : data;
     return this.request<WordBatch>(`/batches/${batchId}`, {
       method: 'PUT',
-      body: JSON.stringify({ title }),
+      body: JSON.stringify(payload),
     });
   }
 

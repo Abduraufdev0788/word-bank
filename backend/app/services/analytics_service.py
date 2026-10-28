@@ -122,7 +122,14 @@ class AnalyticsService:
         )
         today_reviews_count = (await db.execute(today_revs_stmt)).scalar() or 0
 
-        words_learned_today = today_act.words_learned if today_act else 0
+        # Count words added to vocabulary today
+        today_created_words_stmt = select(func.count(Word.id)).where(
+            Word.user_id == user_id,
+            Word.created_at >= today_start,
+        )
+        today_created_words_count = (await db.execute(today_created_words_stmt)).scalar() or 0
+
+        words_learned_today = max(today_act.words_learned if today_act else 0, today_created_words_count)
         words_reviewed_today = max(today_act.words_reviewed if today_act else 0, today_reviews_count)
         today_study_time_seconds = max(
             today_act.total_active_seconds if today_act else 0,

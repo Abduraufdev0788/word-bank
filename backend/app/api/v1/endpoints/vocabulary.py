@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.models.user import User
+from app.models.learning import DailyActivity
 from app.models.vocabulary import Word, WordBatch, WordExample, WordProgress
 from app.schemas.vocabulary import (
     VerifyAnswerRequest,
@@ -289,6 +290,27 @@ async def create_word(
         is_weak=False,
     )
     db.add(progress)
+
+    # Update today's DailyActivity (words_learned += 1)
+    today_date = datetime.now(timezone.utc).date()
+    act_stmt = select(DailyActivity).where(
+        DailyActivity.user_id == current_user.id,
+        DailyActivity.activity_date == today_date,
+    )
+    today_activity = (await db.execute(act_stmt)).scalar_one_or_none()
+    if today_activity:
+        today_activity.words_learned = (today_activity.words_learned or 0) + 1
+    else:
+        today_activity = DailyActivity(
+            user_id=current_user.id,
+            activity_date=today_date,
+            words_learned=1,
+            words_reviewed=0,
+            total_active_seconds=0,
+            quizzes_taken=0,
+            streak_day_count=1,
+        )
+        db.add(today_activity)
 
     # Update batch statistics
     await recalculate_batch_status(dest_batch.id, db)

@@ -44,6 +44,7 @@ const MainApp: React.FC = () => {
   const [isAddWordOpen, setIsAddWordOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [storyBatchId, setStoryBatchId] = useState<string | undefined>(undefined);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState<number>(0);
 
   const fetchGlobalStats = async () => {
     if (!user) return;
@@ -155,6 +156,7 @@ const MainApp: React.FC = () => {
         <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-28 lg:pb-8">
           {currentTab === 'dashboard' && (
             <Dashboard
+              key={dashboardRefreshKey}
               onStartReview={() => handleSelectTab('review')}
               onOpenAddWord={() => setIsAddWordOpen(true)}
               onOpenImport={() => setIsImportOpen(true)}
@@ -340,6 +342,7 @@ const MainApp: React.FC = () => {
         batches={batches}
         onWordAdded={() => {
           fetchGlobalStats();
+          setDashboardRefreshKey((prev) => prev + 1);
         }}
       />
 
@@ -348,6 +351,7 @@ const MainApp: React.FC = () => {
         onClose={() => setIsImportOpen(false)}
         onImportSuccess={() => {
           fetchGlobalStats();
+          setDashboardRefreshKey((prev) => prev + 1);
           handleSelectTab('batches');
         }}
       />

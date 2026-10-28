@@ -10,6 +10,8 @@ import {
   FolderPlus,
   Trash2,
   AlertCircle,
+  Edit3,
+  Check,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { WordBatch, Word } from '../types';
@@ -32,6 +34,14 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
   const [newBatchTitle, setNewBatchTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Edit Batch Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<WordBatch | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editIsComplete, setEditIsComplete] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // 2-Step Study Modal State (Flashcard -> Written test)
   const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
@@ -113,6 +123,41 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
       setCreateError(err.message || "To'plam yaratishda xatolik yuz berdi");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleOpenEditModal = (batch: WordBatch) => {
+    setEditingBatch(batch);
+    setEditTitle(batch.title);
+    setEditIsComplete(batch.is_complete || false);
+    setEditError(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveBatchEdit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingBatch) return;
+    const trimmed = editTitle.trim();
+    if (!trimmed) {
+      setEditError("Iltimos, to'plam nomini kiriting");
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await api.updateBatch(editingBatch.id, {
+        title: trimmed,
+        is_complete: editIsComplete,
+      });
+      setIsEditModalOpen(false);
+      if (selectedBatch && selectedBatch.id === editingBatch.id) {
+        setSelectedBatch(updated);
+      }
+      await fetchBatches();
+    } catch (err: any) {
+      setEditError(err.message || "To'plamni tahrirlashda xatolik yuz berdi");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -240,6 +285,17 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleOpenEditModal(batch);
+                        }}
+                        className="p-1 rounded-lg text-slate-500 hover:text-brand-300 hover:bg-brand-500/15 transition-all opacity-70 group-hover:opacity-100"
+                        title="To'plamni tahrirlash"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDeleteBatch(batch);
                         }}
                         className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 transition-all opacity-70 group-hover:opacity-100"
@@ -312,12 +368,23 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
                 </span>
                 <h3 className="text-xl font-black text-white">{selectedBatch.title}</h3>
               </div>
-              <button
-                onClick={() => setSelectedBatch(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedBatch)}
+                  className="px-3 py-1.5 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="To'plamni tahrirlash"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-brand-400" />
+                  <span>Tahrirlash</span>
+                </button>
+                <button
+                  onClick={() => setSelectedBatch(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="overflow-y-auto flex-1 pr-2 space-y-3">
@@ -514,6 +581,154 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
                     </>
                   )}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Batch Modal */}
+      {isEditModalOpen && editingBatch && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-pop-in">
+          <div className="bg-dark-900 border border-dark-700/90 w-full max-w-md rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-dark-800 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/30 text-brand-400 flex items-center justify-center">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">To'plamni Tahrirlash</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] font-mono font-bold text-brand-400">
+                      To'plam #{editingBatch.batch_number}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      ({editingBatch.word_count}/20 so'z)
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBatchEdit} className="space-y-4">
+              {editError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200">
+                  To'plam nomi <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="To'plam nomini kiriting..."
+                  autoFocus
+                  maxLength={150}
+                  className="w-full px-4 py-2.5 rounded-xl bg-dark-950 border border-dark-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm text-white placeholder-slate-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Status Toggle / Checkbox */}
+              <div className="p-3 rounded-xl bg-dark-850 border border-dark-800 flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-200">
+                    To'plam holati
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    {editIsComplete
+                      ? "To'plam to'liq yodlangan yoki yakunlangan deb belgilangan"
+                      : "To'plam o'rganish va yangi so'zlar qabul qilish jarayonida"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditIsComplete(!editIsComplete)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    editIsComplete
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-glow-emerald/10'
+                      : 'bg-dark-800 text-slate-400 border-dark-700 hover:text-slate-200'
+                  }`}
+                >
+                  {editIsComplete ? "✓ Yakunlangan" : "O'rganilmoqda"}
+                </button>
+              </div>
+
+              {/* Suggestion Chips */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-medium">Tezkor nomlar:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'IELTS Essential 500',
+                    'Kundalik so\'zlashuv',
+                    'IT & Dasturlash',
+                    'Biznes & Moliya',
+                    'Sayohatchi lug\'ati',
+                    'A1-A2 Boshlang\'ich',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditTitle(preset)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-dark-800 hover:bg-brand-500/20 text-slate-300 hover:text-brand-300 border border-dark-700 hover:border-brand-500/40 transition-all"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-dark-800 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toDelete = editingBatch;
+                    setIsEditModalOpen(false);
+                    if (toDelete) handleDeleteBatch(toDelete);
+                  }}
+                  className="px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>O'chirish</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-dark-850 hover:bg-dark-800 text-slate-300 text-xs font-semibold transition-colors"
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEdit || !editTitle.trim()}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {savingEdit ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Saqlanmoqda...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>O'zgarishlarni saqlash</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -116,6 +116,7 @@ class WordBatchCreate(BaseModel):
 
 class WordBatchUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=150)
+    is_complete: Optional[bool] = None
 
 
 class ImportPreviewRow(BaseModel):

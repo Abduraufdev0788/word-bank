@@ -161,8 +161,11 @@ async def update_batch(
             detail="To'plam topilmadi",
         )
 
-    if batch_in.title:
+    if batch_in.title is not None and batch_in.title.strip():
         batch.title = batch_in.title.strip()
+
+    if batch_in.is_complete is not None:
+        batch.is_complete = batch_in.is_complete
 
     await db.commit()
     await db.refresh(batch)
