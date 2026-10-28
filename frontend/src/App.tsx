@@ -11,6 +11,7 @@ import { MiniStories } from './pages/MiniStories';
 import { WeakWords } from './pages/WeakWords';
 import { SpeakingCoach } from './pages/SpeakingCoach';
 import { Settings } from './pages/Settings';
+import { PracticeQuiz } from './pages/PracticeQuiz';
 import { Auth } from './pages/Auth';
 import { AddWordModal } from './components/modals/AddWordModal';
 import { ImportModal } from './components/modals/ImportModal';
@@ -19,17 +20,22 @@ import { WordBatch } from './types';
 import {
   LayoutDashboard,
   Sparkles,
+  Trophy,
   Layers,
-  BrainCircuit,
   Menu,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
+import { useFullscreen } from './hooks/useFullscreen';
 
 const MainApp: React.FC = () => {
   const { user, loading } = useAuth();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [dueCount, setDueCount] = useState<number>(0);
   const [streakDays, setStreakDays] = useState<number>(0);
   const [batches, setBatches] = useState<WordBatch[]>([]);
+  const [quizInitialMode, setQuizInitialMode] = useState<'mastered_50' | 'all_50' | 'weak'>('mastered_50');
 
   // Mobile drawer state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -84,6 +90,11 @@ const MainApp: React.FC = () => {
         return { title: 'Boshqaruv Paneli', subtitle: "O'quv ko'rsatkichlari va kunlik rejalar" };
       case 'review':
         return { title: 'Kunlik Takrorlash (SRS)', subtitle: 'Spaced Repetition SM-2 xotira pleyeri' };
+      case 'practice':
+        return {
+          title: "50 talik Test & Mustahkamlash",
+          subtitle: "Bilgan so'zlar va barcha so'zlar bo'yicha intensiv viktorina",
+        };
       case 'batches':
         return { title: "Lug'at To'plamlari", subtitle: '20 talik qulay to\'plamlar' };
       case 'words':
@@ -153,11 +164,23 @@ const MainApp: React.FC = () => {
               onNavigateToMasteredWords={() => handleSelectTab('mastered')}
               onNavigateToWords={() => handleSelectTab('words')}
               onNavigateToSpeaking={() => handleSelectTab('speaking')}
+              onStartPracticeQuiz={(mode) => {
+                setQuizInitialMode(mode || 'mastered_50');
+                handleSelectTab('practice');
+              }}
             />
           )}
 
           {currentTab === 'review' && (
             <DailyReview onBackToDashboard={() => handleSelectTab('dashboard')} />
+          )}
+
+          {currentTab === 'practice' && (
+            <PracticeQuiz
+              initialMode={quizInitialMode}
+              onBackToDashboard={() => handleSelectTab('dashboard')}
+              onNavigateToWeakWords={() => handleSelectTab('weak')}
+            />
           )}
 
           {currentTab === 'speaking' && (
@@ -203,65 +226,110 @@ const MainApp: React.FC = () => {
         </main>
       </div>
 
-      {/* Mobile & Tablet Bottom Navigation Bar (< 1024px) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-900/95 backdrop-blur-lg border-t border-dark-800 px-3 py-1.5 flex items-center justify-around select-none shadow-2xl">
+      {/* Mobile & Tablet Pro Floating Bottom Dock (< 1024px) */}
+      <nav className="lg:hidden fixed bottom-2 left-2.5 right-2.5 z-40 bg-dark-900/92 backdrop-blur-2xl border border-dark-750/90 rounded-2xl px-1.5 py-1 flex items-center justify-between select-none shadow-[0_12px_40px_rgba(0,0,0,0.75)] pb-[max(env(safe-area-inset-bottom),0.375rem)] transition-all">
+        {/* Asosiy */}
         <button
           onClick={() => handleSelectTab('dashboard')}
-          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all relative ${
             currentTab === 'dashboard'
-              ? 'text-brand-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-white bg-gradient-to-b from-brand-500/25 to-brand-600/10 border border-brand-500/35 shadow-glow-brand/20'
+              : 'text-slate-400 hover:text-slate-200 active:scale-95'
           }`}
         >
-          <LayoutDashboard className="w-5 h-5" />
-          <span className="text-[10px]">Asosiy</span>
-        </button>
-
-        <button
-          onClick={() => handleSelectTab('review')}
-          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl relative transition-all ${
-            currentTab === 'review'
-              ? 'text-brand-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Sparkles className="w-5 h-5" />
-          <span className="text-[10px]">Takrorlash</span>
-          {dueCount > 0 && (
-            <span className="absolute top-0 right-1 w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse ring-2 ring-dark-900" />
+          <LayoutDashboard className={`w-4 sm:w-5 h-4 sm:h-5 ${currentTab === 'dashboard' ? 'text-brand-400' : ''}`} />
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">Asosiy</span>
+          {currentTab === 'dashboard' && (
+            <span className="w-1 h-1 rounded-full bg-brand-400 absolute bottom-0.5 shadow-glow-brand" />
           )}
         </button>
 
+        {/* Takrorlash */}
         <button
-          onClick={() => handleSelectTab('stories')}
-          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${
-            currentTab === 'stories'
-              ? 'text-brand-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+          onClick={() => handleSelectTab('review')}
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl relative transition-all ${
+            currentTab === 'review'
+              ? 'text-white bg-gradient-to-b from-brand-500/25 to-brand-600/10 border border-brand-500/35 shadow-glow-brand/20'
+              : 'text-slate-400 hover:text-slate-200 active:scale-95'
           }`}
         >
-          <BrainCircuit className="w-5 h-5" />
-          <span className="text-[10px]">Hikoyalar</span>
+          <div className="relative">
+            <Sparkles className={`w-4 sm:w-5 h-4 sm:h-5 ${currentTab === 'review' ? 'text-brand-400' : ''}`} />
+            {dueCount > 0 && (
+              <span className="absolute -top-1 -right-2 px-1 min-w-[15px] h-3.5 text-[8px] font-black rounded-full bg-brand-500 text-white flex items-center justify-center ring-2 ring-dark-900 animate-pulse">
+                {dueCount > 99 ? '99+' : dueCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">Takror</span>
+          {currentTab === 'review' && (
+            <span className="w-1 h-1 rounded-full bg-brand-400 absolute bottom-0.5 shadow-glow-brand" />
+          )}
         </button>
 
+        {/* Test 50 */}
+        <button
+          onClick={() => handleSelectTab('practice')}
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all relative ${
+            currentTab === 'practice'
+              ? 'text-white bg-gradient-to-b from-brand-500/25 to-brand-600/10 border border-brand-500/35 shadow-glow-brand/20'
+              : 'text-slate-400 hover:text-slate-200 active:scale-95'
+          }`}
+        >
+          <Trophy className={`w-4 sm:w-5 h-4 sm:h-5 ${currentTab === 'practice' ? 'text-amber-400' : ''}`} />
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">Test 50</span>
+          {currentTab === 'practice' && (
+            <span className="w-1 h-1 rounded-full bg-amber-400 absolute bottom-0.5 shadow-glow-brand" />
+          )}
+        </button>
+
+        {/* To'plamlar */}
         <button
           onClick={() => handleSelectTab('batches')}
-          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-all ${
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all relative ${
             currentTab === 'batches'
-              ? 'text-brand-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-white bg-gradient-to-b from-brand-500/25 to-brand-600/10 border border-brand-500/35 shadow-glow-brand/20'
+              : 'text-slate-400 hover:text-slate-200 active:scale-95'
           }`}
         >
-          <Layers className="w-5 h-5" />
-          <span className="text-[10px]">To'plam</span>
+          <Layers className={`w-4 sm:w-5 h-4 sm:h-5 ${currentTab === 'batches' ? 'text-cyan-400' : ''}`} />
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">To'plam</span>
+          {currentTab === 'batches' && (
+            <span className="w-1 h-1 rounded-full bg-cyan-400 absolute bottom-0.5 shadow-glow-brand" />
+          )}
         </button>
 
+        {/* To'liq Ekran (Fullscreen Toggle) */}
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all relative active:scale-95 ${
+            isFullscreen
+              ? 'text-brand-300 bg-brand-500/20 border border-brand-500/40 shadow-glow-brand/20'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title={isFullscreen ? "To'liq ekrandan chiqish" : "To'liq ekran rejimi"}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-4 sm:w-5 h-4 sm:h-5 text-brand-400 animate-pop-in" />
+          ) : (
+            <Maximize2 className="w-4 sm:w-5 h-4 sm:h-5" />
+          )}
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">
+            {isFullscreen ? 'Kichrayt' : 'Ekran'}
+          </span>
+          {isFullscreen && (
+            <span className="w-1 h-1 rounded-full bg-brand-400 absolute bottom-0.5 shadow-glow-brand" />
+          )}
+        </button>
+
+        {/* Menyu */}
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl text-slate-400 hover:text-slate-200 transition-all"
+          className="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all active:scale-95"
         >
-          <Menu className="w-5 h-5" />
-          <span className="text-[10px]">Menyu</span>
+          <Menu className="w-4 sm:w-5 h-4 sm:h-5" />
+          <span className="text-[10px] font-semibold mt-0.5 tracking-tight">Menyu</span>
         </button>
       </nav>
 

@@ -14,6 +14,8 @@ from app.core.database import get_db
 from app.models.user import User
 from app.models.vocabulary import Word, WordBatch, WordExample, WordProgress
 from app.schemas.vocabulary import (
+    VerifyAnswerRequest,
+    VerifyAnswerResponse,
     WordCreate,
     WordOut,
     WordUpdate,
@@ -95,6 +97,51 @@ async def get_mastered_practice_words(
         words.extend(any_result.scalars().all())
 
     return words
+
+
+@router.get(
+    "/all-practice",
+    response_model=List[WordOut],
+    summary="Lug'atdagi barcha so'zlar orasidan 50 tasini mashq qilish uchun olish",
+)
+async def get_all_practice_words(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Returns up to 50 randomized words across the user's entire vocabulary."""
+    stmt = (
+        select(Word)
+        .options(
+            selectinload(Word.examples),
+            selectinload(Word.progress),
+        )
+        .where(Word.user_id == current_user.id)
+        .order_by(func.random())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+@router.get(
+    "/weak-words",
+    summary="Foydalanuvchi ko'p xato qilgan yoki qiynalgan so'zlar ro'yxati (Vocabulary)",
+)
+async def get_weak_words_vocabulary(
+    limit: int = Query(default=20, ge=1, le=100),
+    randomize: bool = Query(default=False),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Returns list of weak words for the current user."""
+    from app.services.analytics_service import analytics_service
+    return await analytics_service.get_weak_words_list(
+        user_id=current_user.id,
+        db=db,
+        limit=limit,
+        randomize=randomize,
+    )
 
 
 @router.get(
@@ -415,3 +462,39 @@ async def delete_word(
         await recalculate_batch_status(batch_id, db)
 
     await db.commit()
+
+
+@router.post(
+    "/verify-answer",
+    response_model=VerifyAnswerResponse,
+    summary="Foydalanuvchi yozgan inglizcha javobni sinonimlar va lug'atdosh so'zlar bilan tekshirish",
+)
+async def verify_user_answer(
+    payload: VerifyAnswerRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    stmt = select(Word).where(Word.id == payload.word_id, Word.user_id == current_user.id)
+    word = (await db.execute(stmt)).scalar_one_or_none()
+    if not word:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="So'z topilmadi",
+        )
+
+    from app.services.synonym_service import verify_english_answer
+
+    is_correct, is_synonym, explanation = await verify_english_answer(
+        user_input=payload.user_answer,
+        target_word=word,
+        user_id=current_user.id,
+        db=db,
+    )
+
+    return VerifyAnswerResponse(
+        is_correct=is_correct,
+        is_synonym_match=is_synonym,
+        correct_english=word.english_word,
+        correct_uzbek=word.uzbek_translation,
+        explanation=explanation,
+    )

@@ -34,28 +34,31 @@ async def create_or_get_batch(
 ) -> Any:
     """Finds or creates a batch with the specified title (e.g. named after a story)."""
     title = batch_in.title.strip()
-    stmt = (
-        select(WordBatch)
-        .where(
-            WordBatch.user_id == current_user.id,
-            func.lower(WordBatch.title) == title.lower(),
-            WordBatch.is_complete == False,
+    if not batch_in.force_new:
+        stmt = (
+            select(WordBatch)
+            .where(
+                WordBatch.user_id == current_user.id,
+                func.lower(WordBatch.title) == title.lower(),
+                WordBatch.is_complete == False,
+            )
+            .order_by(WordBatch.batch_number.desc())
+            .limit(1)
         )
-        .order_by(WordBatch.batch_number.desc())
-        .limit(1)
-    )
-    existing = (await db.execute(stmt)).scalar_one_or_none()
-    if existing:
-        return existing
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+        if existing:
+            return existing
 
     max_stmt = select(func.max(WordBatch.batch_number)).where(WordBatch.user_id == current_user.id)
     max_num = (await db.execute(max_stmt)).scalar() or 0
     next_num = max_num + 1
 
+    final_title = title if title else f"To'plam #{next_num}"
+
     new_batch = WordBatch(
         user_id=current_user.id,
         batch_number=next_num,
-        title=title,
+        title=final_title,
         status="new",
         word_count=0,
         is_complete=False,

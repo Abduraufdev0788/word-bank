@@ -2,6 +2,7 @@ import React from 'react';
 import {
   LayoutDashboard,
   Sparkles,
+  Trophy,
   Layers,
   BookOpen,
   FileUp,
@@ -14,9 +15,12 @@ import {
   BrainCircuit,
   CheckCircle2,
   Mic,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStudyTime } from '../../context/StudyTimeContext';
+import { useFullscreen } from '../../hooks/useFullscreen';
 
 interface SidebarProps {
   currentTab: string;
@@ -41,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { activeSecondsToday, isStudying } = useStudyTime();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const formatStudyTime = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60);
@@ -61,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: dueCount > 0 ? dueCount : undefined,
       badgeColor: 'bg-brand-500 text-white',
     },
+    { id: 'practice', label: '50 talik Test (Quiz)', icon: Trophy },
     { id: 'speaking', label: 'AI Speaking & Talaffuz', icon: Mic },
     { id: 'batches', label: "To'plamlar (20 talik)", icon: Layers },
     { id: 'words', label: "So'zlar Banki", icon: BookOpen },
@@ -188,6 +194,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom User & Activity Widget */}
         <div className="p-4 border-t border-dark-800 space-y-3 bg-dark-900 shrink-0">
+          {/* Fullscreen Mode Quick Switch */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="w-full p-2.5 rounded-xl bg-dark-850 hover:bg-dark-800 border border-dark-800 hover:border-brand-500/30 flex items-center justify-between text-xs transition-all text-slate-300 hover:text-white active:scale-95 group shadow-sm"
+            title={isFullscreen ? "To'liq ekrandan chiqish" : "To'liq ekran rejimi (Fullscreen)"}
+          >
+            <div className="flex items-center gap-2">
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5 text-brand-400" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-brand-300" />
+              )}
+              <span className="font-medium">
+                {isFullscreen ? "Odatdagi ekran" : "To'liq ekran rejimi"}
+              </span>
+            </div>
+            <span
+              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                isFullscreen
+                  ? 'bg-brand-500/20 text-brand-300 border-brand-500/30'
+                  : 'bg-dark-900 text-slate-400 border-dark-750'
+              }`}
+            >
+              {isFullscreen ? 'FAOL' : 'YOQISH'}
+            </span>
+          </button>
+
           {/* Active Study Time pill */}
           <div className="p-2.5 rounded-xl bg-dark-850 border border-dark-800 flex items-center justify-between">
             <div className="flex items-center gap-2">

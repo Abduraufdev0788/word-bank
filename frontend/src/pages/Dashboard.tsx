@@ -39,6 +39,7 @@ interface DashboardProps {
   onNavigateToMasteredWords?: () => void;
   onNavigateToWords?: () => void;
   onNavigateToSpeaking?: () => void;
+  onStartPracticeQuiz?: (mode?: 'mastered_50' | 'all_50') => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -51,6 +52,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToMasteredWords,
   onNavigateToWords,
   onNavigateToSpeaking,
+  onStartPracticeQuiz,
 }) => {
   const { activeSecondsToday, isStudying } = useStudyTime();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -315,7 +317,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-extrabold text-white group-hover:text-brand-300 transition-colors">
-                      Bilgan so'zlarni mustahkamlash
+                      50 talik Test & Mustahkamlash
                     </h4>
                     {(goals.mastered_reviewed_today || 0) >= 50 && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
@@ -324,7 +326,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    Bugun o'zlashtirilgan so'zlaringiz orasidan 50 tasini qayta ishlab xotirani yangilang.
+                    Bilgan so'zlaringizni sinovdan o'tkazing. Xato qilingan so'zlar avtomatik «Zaif so'zlar» ro'yxatiga o'tadi!
                   </p>
                 </div>
               </div>
@@ -343,19 +345,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="h-full bg-gradient-to-r from-brand-600 via-accent-violet to-accent-cyan rounded-full transition-all duration-500"
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMasteredBoosterOpen(true)}
-                className="w-full mt-2 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>
-                  {(goals.mastered_reviewed_today || 0) >= 50
-                    ? "Yana 50 ta so'zni mustahkamlash"
-                    : "50 ta so'zni boshlash 🚀"}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onStartPracticeQuiz ? onStartPracticeQuiz('mastered_50') : setIsMasteredBoosterOpen(true)
+                  }
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Bilgan so'zlar (50 ta)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onStartPracticeQuiz ? onStartPracticeQuiz('all_50') : setIsMasteredBoosterOpen(true)
+                  }
+                  className="py-2.5 px-3 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 hover:border-brand-500/40 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-brand-400" />
+                  <span>Barcha so'zlar (50 ta)</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -551,7 +564,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Active Study Time Card */}
-        <div className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-cyan-500/40 transition-all duration-300 shadow-lg group">
+        <div
+          onClick={onStartReview}
+          className="p-3.5 sm:p-5 lg:p-6 rounded-2xl bg-gradient-to-br from-dark-900 via-dark-850 to-dark-900 border border-dark-800/90 hover:border-cyan-500/50 transition-all duration-300 shadow-lg cursor-pointer group"
+          title="O'qish va takrorlashni davom ettirish"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2 sm:mb-3">
             <span className="text-[11px] sm:text-xs font-bold text-slate-300">Bugungi vaqt</span>
             <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-accent-cyan group-hover:scale-110 transition-transform flex items-center gap-1.5">
@@ -592,8 +609,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </p>
                 <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between font-mono">
-                  <span>Jami o'rganilgan:</span>
-                  <span className="text-slate-300 font-bold">{totalHours} soat</span>
+                  <span>Jami: <strong className="text-slate-300">{totalHours} soat</strong></span>
+                  <span className="text-accent-cyan font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform font-sans">
+                    O'qish <ChevronRight className="w-3 h-3" />
+                  </span>
                 </p>
               </>
             );
@@ -639,7 +658,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* Reverse Recall / Typed Recall */}
           <div
-            onClick={onStartReview}
+            onClick={() => {
+              if (stats.words_due_today > 0) {
+                onStartReview();
+              } else if (onStartPracticeQuiz) {
+                onStartPracticeQuiz('mastered_50');
+              } else {
+                onStartReview();
+              }
+            }}
             className="p-5 rounded-2xl bg-dark-900 border border-dark-800 hover:border-brand-500/50 hover:bg-dark-850/80 transition-all cursor-pointer group shadow-md"
           >
             <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/30 text-brand-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
@@ -807,9 +834,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="space-y-4">
             {/* Words Goal */}
-            <div className="space-y-1.5">
+            <div
+              onClick={onOpenAddWord}
+              className="space-y-1.5 p-2 rounded-xl hover:bg-dark-850/80 cursor-pointer transition-all border border-transparent hover:border-dark-750 group"
+              title="Yangi so'z qo'shish"
+            >
               <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">Yangi so'zlar:</span>
+                <span className="text-slate-400 group-hover:text-slate-200 font-medium flex items-center gap-1">
+                  Yangi so'zlar: <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-400" />
+                </span>
                 <span className="font-bold text-slate-200 font-mono">
                   {goals.words_learned_today} / {goals.daily_words_goal}
                 </span>
@@ -823,9 +856,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Review Goal */}
-            <div className="space-y-1.5">
+            <div
+              onClick={onStartReview}
+              className="space-y-1.5 p-2 rounded-xl hover:bg-dark-850/80 cursor-pointer transition-all border border-transparent hover:border-dark-750 group"
+              title="SRS takrorlashni boshlash"
+            >
               <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">Takrorlashlar:</span>
+                <span className="text-slate-400 group-hover:text-slate-200 font-medium flex items-center gap-1">
+                  Takrorlashlar: <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />
+                </span>
                 <span className="font-bold text-slate-200 font-mono">
                   {goals.words_reviewed_today} / {goals.daily_review_goal}
                 </span>
@@ -839,9 +878,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Mastered 50-Word Challenge Goal */}
-            <div className="space-y-1.5">
+            <div
+              onClick={() =>
+                onStartPracticeQuiz ? onStartPracticeQuiz('mastered_50') : setIsMasteredBoosterOpen(true)
+              }
+              className="space-y-1.5 p-2 rounded-xl hover:bg-dark-850/80 cursor-pointer transition-all border border-transparent hover:border-dark-750 group"
+              title="50 talik bilgan so'zlar sinovini boshlash"
+            >
               <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">Bilgan so'zlar (50 challenge):</span>
+                <span className="text-slate-400 group-hover:text-slate-200 font-medium flex items-center gap-1">
+                  Bilgan so'zlar (50 challenge): <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-300" />
+                </span>
                 <span className="font-bold text-brand-300 font-mono">
                   {goals.mastered_reviewed_today || 0} / 50 ta so'z
                 </span>
@@ -855,9 +902,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Study Time Goal */}
-            <div className="space-y-1.5">
+            <div
+              onClick={onStartReview}
+              className="space-y-1.5 p-2 rounded-xl hover:bg-dark-850/80 cursor-pointer transition-all border border-transparent hover:border-dark-750 group"
+              title="O'qish vaqtini oshirish"
+            >
               <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">O'qish vaqti:</span>
+                <span className="text-slate-400 group-hover:text-slate-200 font-medium flex items-center gap-1">
+                  O'qish vaqti: <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400" />
+                </span>
                 <span className="font-bold text-slate-200 font-mono">
                   {goals.study_time_minutes_today} / {goals.daily_study_time_minutes} daqiqa
                 </span>
@@ -896,18 +949,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="divide-y divide-dark-800/80">
             {recent_activities.slice(0, 5).map((act) => (
-              <div key={act.id} className="py-3 flex items-center justify-between gap-3">
+              <div
+                key={act.id}
+                onClick={act.is_success === false ? onNavigateToWeakWords : onStartReview}
+                className="py-2.5 px-2.5 rounded-xl hover:bg-dark-850/80 cursor-pointer flex items-center justify-between gap-3 transition-all group"
+                title={act.is_success === false ? "Zaif so'zlarga o'tish" : "Takrorlashga o'tish"}
+              >
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-2 h-2 rounded-full ${
                       act.is_success === false ? 'bg-rose-500' : 'bg-emerald-400 shadow-sm'
                     }`}
                   />
-                  <p className="text-xs text-slate-200 font-medium">{act.description}</p>
+                  <p className="text-xs text-slate-200 group-hover:text-white font-medium">{act.description}</p>
                 </div>
-                <span className="text-[11px] text-slate-500 font-mono shrink-0">
-                  {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 font-mono shrink-0">
+                    {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-300 transition-colors" />
+                </div>
               </div>
             ))}
           </div>

@@ -6,6 +6,10 @@ import {
   X,
   Volume2,
   Sparkles,
+  PlusCircle,
+  FolderPlus,
+  Trash2,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { WordBatch, Word } from '../types';
@@ -22,6 +26,12 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
   const [selectedBatch, setSelectedBatch] = useState<WordBatch | null>(null);
   const [batchWords, setBatchWords] = useState<Word[]>([]);
   const [loadingWords, setLoadingWords] = useState(false);
+
+  // Create Batch Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newBatchTitle, setNewBatchTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // 2-Step Study Modal State (Flashcard -> Written test)
   const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
@@ -84,6 +94,44 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
     }
   };
 
+  const handleCreateBatch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newBatchTitle.trim();
+    if (!trimmed) {
+      setCreateError("Iltimos, to'plam nomini kiriting");
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await api.createBatch(trimmed, true);
+      setNewBatchTitle('');
+      setIsCreateModalOpen(false);
+      await fetchBatches();
+    } catch (err: any) {
+      setCreateError(err.message || "To'plam yaratishda xatolik yuz berdi");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteBatch = async (batch: WordBatch) => {
+    const confirmMessage =
+      batch.word_count > 0
+        ? `«${batch.title}» to'plamida ${batch.word_count} ta so'z bor. Haqiqatan ham ushbu to'plamni o'chirmoqchimisiz?`
+        : `«${batch.title}» to'plamini o'chirishni tasdiqlaysizmi?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await api.deleteBatch(batch.id);
+      await fetchBatches();
+    } catch (err: any) {
+      alert(err.message || "To'plamni o'chirib bo'lmadi");
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
@@ -108,27 +156,60 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
           </p>
         </div>
 
-        <button
-          onClick={onOpenImport}
-          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-glow-brand transition-all text-center justify-center"
-        >
-          Yangi fayl yuklash
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateError(null);
+              setNewBatchTitle('');
+              setIsCreateModalOpen(true);
+            }}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all active:scale-95"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Yangi to'plam ochish</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenImport}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-dark-850 hover:bg-dark-800 border border-dark-750 text-slate-200 text-xs font-semibold transition-all active:scale-95"
+          >
+            <span>Fayl yuklash</span>
+          </button>
+        </div>
       </div>
 
       {batches.length === 0 ? (
-        <div className="p-8 sm:p-12 text-center rounded-2xl bg-dark-900 border border-dark-800 space-y-3">
-          <Layers className="w-10 h-10 text-slate-500 mx-auto" />
-          <h4 className="text-base font-bold text-white">Hozircha to'plamlar mavjud emas</h4>
-          <p className="text-xs text-slate-400">
-            Fayl import qiling yoki so'z qo'shing, tizim avtomatik 20 talik to'plamlarni yaratadi.
-          </p>
-          <button
-            onClick={onOpenImport}
-            className="mt-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold"
-          >
-            Fayl yuklash
-          </button>
+        <div className="p-8 sm:p-12 text-center rounded-2xl bg-dark-900 border border-dark-800 space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-brand-500/15 border border-brand-500/30 text-brand-400 flex items-center justify-center mx-auto">
+            <FolderPlus className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-base font-bold text-white">Hozircha to'plamlar mavjud emas</h4>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              O'zingiz yangi to'plam yarating yoki lug'at faylini (TXT, CSV, XLSX) import qiling.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            <button
+              onClick={() => {
+                setCreateError(null);
+                setNewBatchTitle('');
+                setIsCreateModalOpen(true);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet text-white text-xs font-bold shadow-glow-brand flex items-center gap-1.5 active:scale-95 transition-all"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Yangi to'plam ochish</span>
+            </button>
+            <button
+              onClick={onOpenImport}
+              className="px-4 py-2.5 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-300 text-xs font-semibold active:scale-95 transition-all"
+            >
+              Fayl yuklash
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -145,15 +226,28 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
                     <span className="px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-brand-500/15 text-brand-400 border border-brand-500/30">
                       To'plam #{batch.batch_number}
                     </span>
-                    <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        isFull
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                      }`}
-                    >
-                      {batch.word_count}/20 so'z
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          isFull
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        }`}
+                      >
+                        {batch.word_count}/20 so'z
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteBatch(batch);
+                        }}
+                        className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 transition-all opacity-70 group-hover:opacity-100"
+                        title="To'plamni o'chirish"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -324,6 +418,107 @@ export const Batches: React.FC<BatchesProps> = ({ onStartBatchStory, onOpenImpor
         title={studyTitle}
         words={studyWords}
       />
+
+      {/* Create Batch Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-pop-in">
+          <div className="bg-dark-900 border border-dark-700/90 w-full max-w-md rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-dark-800 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/30 text-brand-400 flex items-center justify-center">
+                  <FolderPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">Yangi To'plam Yaratish</h3>
+                  <p className="text-[11px] text-slate-400">20 talik yangi lug'at to'plami</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-dark-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateBatch} className="space-y-4">
+              {createError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{createError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200">
+                  To'plam nomi <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newBatchTitle}
+                  onChange={(e) => setNewBatchTitle(e.target.value)}
+                  placeholder="Masalan: IELTS Essential 500, Sayohat iboralari..."
+                  autoFocus
+                  maxLength={150}
+                  className="w-full px-4 py-2.5 rounded-xl bg-dark-950 border border-dark-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm text-white placeholder-slate-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Suggestion Chips */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-medium">Tavsiya etilgan mavzular:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'IELTS Essential 500',
+                    'Kundalik so\'zlashuv',
+                    'IT & Dasturlash',
+                    'Biznes & Moliya',
+                    'Sayohatchi lug\'ati',
+                    'A1-A2 Boshlang\'ich',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNewBatchTitle(preset)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-dark-800 hover:bg-brand-500/20 text-slate-300 hover:text-brand-300 border border-dark-700 hover:border-brand-500/40 transition-all"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-dark-800 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-dark-850 hover:bg-dark-800 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !newBatchTitle.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-accent-violet hover:from-brand-500 hover:to-accent-violet text-white text-xs font-bold shadow-glow-brand transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {creating ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Yaratilmoqda...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-4 h-4" />
+                      <span>To'plam yaratish</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

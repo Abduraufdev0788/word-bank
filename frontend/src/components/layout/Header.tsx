@@ -1,7 +1,8 @@
 import React from 'react';
-import { Plus, Send, Activity, Menu } from 'lucide-react';
+import { Plus, Send, Activity, Menu, Maximize2, Minimize2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStudyTime } from '../../context/StudyTimeContext';
+import { useFullscreen } from '../../hooks/useFullscreen';
 
 interface HeaderProps {
   title: string;
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user } = useAuth();
   const { isStudying, activeSecondsToday } = useStudyTime();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const formatSeconds = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -73,6 +75,24 @@ export const Header: React.FC<HeaderProps> = ({
             <strong className="font-mono text-slate-100">{formatSeconds(activeSecondsToday)}</strong>
           </span>
         </div>
+
+        {/* Fullscreen Toggle Button (Mobile & Desktop) */}
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className={`p-2 rounded-xl border transition-all active:scale-95 flex items-center justify-center ${
+            isFullscreen
+              ? 'bg-brand-500/20 border-brand-500/40 text-brand-300 shadow-glow-brand/20'
+              : 'bg-dark-850 hover:bg-dark-800 border-dark-700/80 text-slate-300 hover:text-white'
+          }`}
+          title={isFullscreen ? "To'liq ekrandan chiqish" : "To'liq ekran rejimi (Fullscreen)"}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-4 h-4 text-brand-400 animate-pop-in" />
+          ) : (
+            <Maximize2 className="w-4 h-4 text-slate-300 group-hover:text-white" />
+          )}
+        </button>
 
         {/* Telegram bot status button */}
         <button

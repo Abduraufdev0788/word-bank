@@ -41,16 +41,18 @@ export const MasteredBoosterModal: React.FC<MasteredBoosterModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const { startSession, endSession } = useStudyTime();
 
+  const [sourceMode, setSourceMode] = useState<'mastered' | 'all'>('mastered');
+
   useEffect(() => {
     if (isOpen) {
-      loadPracticeWords();
+      loadPracticeWords(sourceMode);
       startSession('mastered_practice');
     } else {
       endSession();
     }
-  }, [isOpen]);
+  }, [isOpen, sourceMode]);
 
-  const loadPracticeWords = async () => {
+  const loadPracticeWords = async (srcMode: 'mastered' | 'all' = sourceMode) => {
     try {
       setLoading(true);
       setIsCompleted(false);
@@ -60,11 +62,14 @@ export const MasteredBoosterModal: React.FC<MasteredBoosterModalProps> = ({
       setSelectedOption(null);
       setStats({ correct: 0, incorrect: 0 });
 
-      // Fetch up to 50 randomized mastered/known words
-      const data = await api.getMasteredPracticeWords(50);
+      // Fetch up to 50 randomized words based on source mode
+      const data =
+        srcMode === 'all'
+          ? await api.getAllPracticeWords(50)
+          : await api.getMasteredPracticeWords(50);
       setWords(data);
     } catch (err) {
-      console.error('Failed to load mastered words for practice:', err);
+      console.error('Failed to load words for practice:', err);
     } finally {
       setLoading(false);
     }
@@ -203,7 +208,33 @@ export const MasteredBoosterModal: React.FC<MasteredBoosterModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Source mode toggle */}
+            <div className="bg-dark-950 rounded-xl p-0.5 border border-dark-800 flex items-center text-xs">
+              <button
+                type="button"
+                onClick={() => setSourceMode('mastered')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                  sourceMode === 'mastered'
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Bilganlar (50)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceMode('all')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                  sourceMode === 'all'
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Barcha so'zlar
+              </button>
+            </div>
+
             {/* Mode toggle */}
             <div className="bg-dark-950 rounded-xl p-0.5 border border-dark-800 flex items-center text-xs">
               <button
@@ -315,7 +346,7 @@ export const MasteredBoosterModal: React.FC<MasteredBoosterModalProps> = ({
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
                 <button
-                  onClick={loadPracticeWords}
+                  onClick={() => loadPracticeWords()}
                   className="w-full sm:w-auto px-5 py-3 rounded-xl bg-dark-800 hover:bg-dark-750 border border-dark-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -492,6 +523,12 @@ export const MasteredBoosterModal: React.FC<MasteredBoosterModalProps> = ({
                           {currentWord.uzbek_translation}
                         </span>
                       </p>
+                      {status === 'incorrect' && (
+                        <p className="text-[11px] text-rose-300 font-bold mt-1.5 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping shrink-0" />
+                          <span>⚠️ Ushbu so'z avtomatik ravishda «Zaif so'zlar» ro'yxatiga qo'shildi!</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 

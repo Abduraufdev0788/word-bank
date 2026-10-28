@@ -2,7 +2,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -670,7 +670,7 @@ async def get_word_of_the_day(
     }
 
 
-# --- 10. Interactive Multiple-Choice Quiz ---
+# --- 10. Interactive Multiple-Choice Quiz & 50-Word Booster ---
 
 @router.get(
     "/quiz/{telegram_user_id}",
@@ -678,60 +678,122 @@ async def get_word_of_the_day(
 )
 async def get_telegram_quiz(
     telegram_user_id: int,
-    count: int = 5,
-    direction: str = "en_to_uz",
+    count: int = Query(default=10, ge=1, le=50),
+    direction: str = Query(default="en_to_uz"),
+    quiz_type: str = Query(default="mastered_50", description="'mastered_50', 'all_50', 'weak', 'batch'"),
+    batch_id: Optional[uuid.UUID] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     user = await get_linked_user(telegram_user_id, db)
-    stmt = (
-        select(Word)
-        .where(Word.user_id == user.id)
-        .order_by(func.random())
-        .limit(max(count, 10))
-    )
-    res = await db.execute(stmt)
-    all_words = res.scalars().all()
 
-    if not all_words:
+    # 1. Fetch eligible words based on quiz_type
+    if quiz_type in ["mastered_50", "mastered"]:
+        stmt = (
+            select(Word)
+            .join(WordProgress, Word.id == WordProgress.word_id)
+            .where(
+                Word.user_id == user.id,
+                (WordProgress.is_mastered == True)
+                | ((WordProgress.times_correct >= 1) & (WordProgress.is_weak == False)),
+            )
+            .order_by(func.random())
+            .limit(count)
+        )
+        res = await db.execute(stmt)
+        quiz_words = list(res.scalars().all())
+
+        # If not enough mastered words, supplement with any words
+        if len(quiz_words) < count:
+            existing_ids = [w.id for w in quiz_words]
+            sup_stmt = (
+                select(Word)
+                .where(
+                    Word.user_id == user.id,
+                    Word.id.not_in(existing_ids) if existing_ids else True,
+                )
+                .order_by(func.random())
+                .limit(count - len(quiz_words))
+            )
+            sup_res = await db.execute(sup_stmt)
+            quiz_words.extend(sup_res.scalars().all())
+
+    elif quiz_type in ["weak", "weak_words"]:
+        stmt = (
+            select(Word)
+            .join(WordProgress, Word.id == WordProgress.word_id)
+            .where(Word.user_id == user.id, WordProgress.is_weak == True)
+            .order_by(func.random())
+            .limit(count)
+        )
+        res = await db.execute(stmt)
+        quiz_words = list(res.scalars().all())
+
+    elif quiz_type == "batch" and batch_id:
+        stmt = (
+            select(Word)
+            .where(Word.user_id == user.id, Word.batch_id == batch_id)
+            .order_by(func.random())
+            .limit(count)
+        )
+        res = await db.execute(stmt)
+        quiz_words = list(res.scalars().all())
+
+    else:
+        # 'all_50' or 'all': entire vocabulary
+        stmt = (
+            select(Word)
+            .where(Word.user_id == user.id)
+            .order_by(func.random())
+            .limit(count)
+        )
+        res = await db.execute(stmt)
+        quiz_words = list(res.scalars().all())
+
+    if not quiz_words:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Viktorina uchun lug'atingizda so'zlar topilmadi. Avval so'z qo'shing: /add",
         )
 
-    quiz_words = all_words[:count]
+    # Fetch pool of all user words for realistic distractors
+    all_res = await db.execute(select(Word).where(Word.user_id == user.id))
+    all_words = list(all_res.scalars().all())
+
     questions = []
 
-    # Common Uzbek distractor fallback pool
+    # Common Uzbek/English distractor fallback pools
     common_distractors_uz = [
         "muvaffaqiyat", "intilish", "qat'iyat", "sodiqlik", "tajriba",
-        "rivojlanish", "ishonch", "kelajak", "natija", "xavfsizlik"
+        "rivojlanish", "ishonch", "kelajak", "natija", "xavfsizlik",
+        "imkoniyat", "bilim", "tushuncha", "qaror", "harakat"
     ]
     common_distractors_en = [
         "achievement", "determination", "experience", "development",
-        "confidence", "progress", "opportunity", "knowledge"
+        "confidence", "progress", "opportunity", "knowledge",
+        "understanding", "decision", "effort", "patience"
     ]
 
     for w in quiz_words:
         if direction == "en_to_uz":
-            correct_opt = w.uzbek_translation
-            prompt = w.english_word
+            correct_opt = w.uzbek_translation.strip()
+            prompt = w.english_word.strip()
             other_opts = [
-                ow.uzbek_translation
+                ow.uzbek_translation.strip()
                 for ow in all_words
-                if ow.id != w.id and ow.uzbek_translation != correct_opt
+                if ow.id != w.id and ow.uzbek_translation.strip().lower() != correct_opt.lower()
             ]
             if len(other_opts) < 3:
-                other_opts += [d for d in common_distractors_uz if d != correct_opt]
+                other_opts += [d for d in common_distractors_uz if d.lower() != correct_opt.lower()]
         else:
-            correct_opt = w.english_word
-            prompt = w.uzbek_translation
+            correct_opt = w.english_word.strip()
+            prompt = w.uzbek_translation.strip()
             other_opts = [
-                ow.english_word
+                ow.english_word.strip()
                 for ow in all_words
-                if ow.id != w.id and ow.english_word != correct_opt
+                if ow.id != w.id and ow.english_word.strip().lower() != correct_opt.lower()
             ]
             if len(other_opts) < 3:
-                other_opts += [d for d in common_distractors_en if d != correct_opt]
+                other_opts += [d for d in common_distractors_en if d.lower() != correct_opt.lower()]
 
         chosen_distractors = random.sample(other_opts, min(3, len(other_opts)))
         options = [correct_opt] + chosen_distractors
@@ -750,7 +812,7 @@ async def get_telegram_quiz(
 @router.post(
     "/quiz/answer/{telegram_user_id}",
     response_model=TelegramQuizAnswerOut,
-    summary="Viktorina javobini tekshirish va SRS xotirasini yangilash",
+    summary="Viktorina javobini tekshirish va SRS xotirasini yangilash (Xato bo'lsa zaif so'zga kiritish)",
 )
 async def check_telegram_quiz_answer(
     telegram_user_id: int,
@@ -770,6 +832,9 @@ async def check_telegram_quiz_answer(
     direction = payload.direction
     selected = payload.selected_option.strip().lower()
 
+    is_synonym = False
+    syn_note = None
+
     if direction == "en_to_uz":
         expected = word.uzbek_translation.strip().lower()
         is_correct = (selected == expected) or (expected in selected) or (selected in expected)
@@ -778,8 +843,16 @@ async def check_telegram_quiz_answer(
         expected = word.english_word.strip().lower()
         is_correct = (selected == expected)
         correct_answer = word.english_word
+        if not is_correct:
+            from app.services.synonym_service import verify_english_answer
+            is_correct, is_synonym, syn_note = await verify_english_answer(
+                user_input=payload.selected_option,
+                target_word=word,
+                user_id=user.id,
+                db=db,
+            )
 
-    # SM-2 update: 5 if correct, 1 if wrong
+    # SM-2 update: 5 if correct, 1 if wrong (wrong sets is_weak=True, is_mastered=False, due_date=now)
     quality = 5 if is_correct else 1
     progress, review = await process_word_review(
         user_id=user.id,
@@ -818,7 +891,13 @@ async def check_telegram_quiz_answer(
 
     await db.commit()
 
-    explanation = f"🇬🇧 {word.english_word} = 🇺🇿 {word.uzbek_translation}"
+    if is_synonym and syn_note:
+        explanation = f"✨ **Ajoyib!** {syn_note}\n\n🇬🇧 {word.english_word} = 🇺🇿 {word.uzbek_translation}"
+    else:
+        explanation = f"🇬🇧 {word.english_word} = 🇺🇿 {word.uzbek_translation}"
+
+    if not is_correct:
+        explanation += "\n\n⚠️ **Diqqat:** Ushbu so'z xato qilindi va «Zaif so'zlar» (bilmaganlar) ro'yxatiga qo'shildi!"
     if word.notes:
         explanation += f"\n💡 {word.notes}"
 
@@ -828,7 +907,56 @@ async def check_telegram_quiz_answer(
         explanation=explanation,
         repetition_number=progress.repetition_number,
         streak_days=streak,
+        was_marked_weak=not is_correct,
+        is_synonym_match=is_synonym,
     )
+
+
+# --- 10.1 File Import via Telegram (TXT, CSV, XLSX) ---
+
+@router.post(
+    "/import-file/{telegram_user_id}",
+    summary="Telegram bot orqali TXT, CSV, XLSX lug'at faylini yuklash va 20 talik to'plamlarga bo'lish",
+)
+async def import_file_telegram(
+    telegram_user_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_linked_user(telegram_user_id, db)
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Fayl tanlanmadi")
+
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
+    if ext not in {"txt", "csv", "xlsx", "xls"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Noto'g'ri fayl formati: .{ext}. Faqat TXT, CSV va XLSX fayllar qabul qilinadi.",
+        )
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Fayl hajmi 5 MB dan oshmasligi kerak")
+
+    from app.services.import_service import execute_commit_import
+
+    resp = await execute_commit_import(
+        user_id=user.id,
+        file_name=file.filename,
+        file_bytes=content,
+        db=db,
+        skip_duplicates=True,
+        fill_incomplete_batch=True,
+    )
+
+    return {
+        "success": True,
+        "imported_words": resp.total_imported,
+        "batches_created": resp.batches_created,
+        "batches_updated": resp.batches_updated,
+        "skipped_duplicates": resp.total_skipped_duplicates,
+        "total_rows": resp.total_imported + resp.total_skipped_duplicates,
+    }
 
 
 # --- 11. Mini Stories for Telegram ---

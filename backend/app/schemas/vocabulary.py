@@ -111,6 +111,7 @@ class WordBatchDetailOut(WordBatchOut):
 
 class WordBatchCreate(BaseModel):
     title: str = Field(min_length=1, max_length=150)
+    force_new: Optional[bool] = False
 
 
 class WordBatchUpdate(BaseModel):
@@ -152,3 +153,25 @@ class ImportCommitResponse(BaseModel):
     total_skipped_duplicates: int
     batches_created: int
     batches_updated: int
+
+
+class VerifyAnswerRequest(BaseModel):
+    word_id: uuid.UUID
+    user_answer: str
+
+
+class VerifyAnswerResponse(BaseModel):
+    is_correct: bool
+    is_synonym_match: bool
+    correct_english: str
+    correct_uzbek: str
+    explanation: Optional[str] = None
+
+
+class ExtractedWordItem(BaseModel):
+    english: str
+    uzbek: str
+
+
+class ExtractedWordsList(BaseModel):
+    words: List[ExtractedWordItem]

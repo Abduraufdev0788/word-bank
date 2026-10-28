@@ -31,10 +31,8 @@ export const WordBank: React.FC<WordBankProps> = ({
   );
 
   useEffect(() => {
-    if (initialFilterMastered) {
-      setFilterMastered(true);
-      setFilterWeak(undefined);
-    }
+    setFilterMastered(initialFilterMastered ? true : undefined);
+    setFilterWeak(undefined);
   }, [initialFilterMastered]);
 
   const fetchWords = async () => {

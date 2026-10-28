@@ -211,3 +211,49 @@ async def test_mastered_practice_words_endpoint(client: AsyncClient):
     words_en = [w["english_word"] for w in words]
     assert "boosterone" in words_en
     assert "boostertwo" in words_en
+
+
+@pytest.mark.asyncio
+async def test_manual_batch_creation_update_delete(client: AsyncClient):
+    token = await create_user_and_get_token(client, "batch_creator@smartvocab.uz")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Create a custom batch
+    resp = await client.post(
+        "/api/v1/batches",
+        json={"title": "IELTS Speaking 500", "force_new": True},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    batch = resp.json()
+    assert batch["title"] == "IELTS Speaking 500"
+    assert batch["word_count"] == 0
+    batch_id = batch["id"]
+
+    # 2. Update batch title
+    update_resp = await client.put(
+        f"/api/v1/batches/{batch_id}",
+        json={"title": "IELTS Speaking 500 (Mastered)"},
+        headers=headers,
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["title"] == "IELTS Speaking 500 (Mastered)"
+
+    # 3. Create another batch with force_new
+    resp2 = await client.post(
+        "/api/v1/batches",
+        json={"title": "IELTS Speaking 500 (Mastered)", "force_new": True},
+        headers=headers,
+    )
+    assert resp2.status_code == 201
+    batch2 = resp2.json()
+    assert batch2["id"] != batch_id
+    assert batch2["batch_number"] == 2
+
+    # 4. Delete the batch
+    del_resp = await client.delete(f"/api/v1/batches/{batch_id}", headers=headers)
+    assert del_resp.status_code == 204
+
+    # 5. Verify deleted
+    get_resp = await client.get(f"/api/v1/batches/{batch_id}", headers=headers)
+    assert get_resp.status_code == 404

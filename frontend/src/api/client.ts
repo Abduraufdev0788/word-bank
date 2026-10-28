@@ -160,10 +160,23 @@ class ApiClient {
     return this.request<WordBatch>(`/batches/${batchId}`);
   }
 
-  async createBatch(title: string): Promise<WordBatch> {
+  async createBatch(title: string, force_new = false): Promise<WordBatch> {
     return this.request<WordBatch>('/batches', {
       method: 'POST',
+      body: JSON.stringify({ title, force_new }),
+    });
+  }
+
+  async updateBatch(batchId: string, title: string): Promise<WordBatch> {
+    return this.request<WordBatch>(`/batches/${batchId}`, {
+      method: 'PUT',
       body: JSON.stringify({ title }),
+    });
+  }
+
+  async deleteBatch(batchId: string): Promise<void> {
+    return this.request<void>(`/batches/${batchId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -192,6 +205,23 @@ class ApiClient {
 
   async getMasteredPracticeWords(limit = 50): Promise<Word[]> {
     return this.request<Word[]>(`/vocabulary/mastered-practice?limit=${limit}`);
+  }
+
+  async getAllPracticeWords(limit = 50): Promise<Word[]> {
+    return this.request<Word[]>(`/vocabulary/all-practice?limit=${limit}`);
+  }
+
+  async verifyAnswer(wordId: string, userAnswer: string): Promise<{
+    is_correct: boolean;
+    is_synonym_match: boolean;
+    correct_english: string;
+    correct_uzbek: string;
+    explanation?: string;
+  }> {
+    return this.request('/vocabulary/verify-answer', {
+      method: 'POST',
+      body: JSON.stringify({ word_id: wordId, user_answer: userAnswer }),
+    });
   }
 
   async createWord(data: {

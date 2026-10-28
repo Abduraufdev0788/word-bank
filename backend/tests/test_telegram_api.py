@@ -222,6 +222,7 @@ async def test_telegram_quiz_weak_words_and_word_of_day(client: AsyncClient):
     wrong_ans_data = wrong_ans_res.json()
     assert wrong_ans_data["is_correct"] is False
     assert wrong_ans_data["correct_answer"] == "Ajoyib"
+    assert wrong_ans_data["was_marked_weak"] is True
 
     # 7. Test Batch words
     batches = (await client.get(f"/api/v1/telegram/batches/{tg_user_id}")).json()
@@ -230,4 +231,16 @@ async def test_telegram_quiz_weak_words_and_word_of_day(client: AsyncClient):
     batch_words_res = await client.get(f"/api/v1/telegram/batches/{tg_user_id}/{batch_id}/words")
     assert batch_words_res.status_code == 200
     assert len(batch_words_res.json()) >= 3
+
+    # 8. Test Telegram File Import (TXT/CSV via Bot)
+    file_content = "apple - olma\nbanana - banan\norange - apelsin\ngrape - uzum\n"
+    import_res = await client.post(
+        f"/api/v1/telegram/import-file/{tg_user_id}",
+        files={"file": ("vocabulary_test.txt", file_content.encode("utf-8"), "text/plain")},
+    )
+    assert import_res.status_code == 200
+    import_data = import_res.json()
+    assert import_data["success"] is True
+    assert import_data["imported_words"] >= 4
+    assert (import_data["batches_created"] + import_data.get("batches_updated", 0)) >= 1
 

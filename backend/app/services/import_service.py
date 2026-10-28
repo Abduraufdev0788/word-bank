@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 import math
 import re
 import uuid
@@ -34,10 +35,93 @@ def detect_columns(headers: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return en_col, uz_col
 
 
+logger = logging.getLogger(__name__)
+
+
+async def ai_clean_and_extract_words(
+    raw_text: str,
+) -> List[Tuple[str, str]]:
+    """
+    Uses Google Gemini AI to analyze, fix, sanitize, and extract English-Uzbek vocabulary
+    pairs from ANY arbitrary text, dirty notes, non-standard lists, or mixed documents.
+    If English words don't have Uzbek translations in the text, Gemini supplies accurate natural translations.
+    """
+    if not settings.GEMINI_API_KEY:
+        return []
+
+    try:
+        from google import genai
+        from google.genai import types
+        from app.schemas.vocabulary import ExtractedWordsList
+
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+        sample_text = raw_text[:15000].strip()
+        if not sample_text:
+            return []
+
+        prompt = (
+            "Sen professional leksikograf va lug'at tahrirchisisan.\n"
+            "Quyida foydalanuvchi tomonidan yuklangan har xil formatdagi (tartibsiz, belgilari chalkash, qatorlari aralashgan, "
+            "raqamlar, defislar yoki hatto faqat inglizcha so'zlar bo'lgan) matn berilgan.\n\n"
+            f"Matn:\n{sample_text}\n\n"
+            "Vazifang:\n"
+            "1. Matndan barcha inglizcha so'z yoki iboralarni (english) va ularning tabiiy to'g'ri o'zbekcha tarjimasini (uzbek) ajratib ol.\n"
+            "2. Agar matnda biror inglizcha so'zning o'zbekcha tarjimasi bo'lmasa, unga eng mos o'zbekcha tarjimani o'zing qo'sh.\n"
+            "3. Barcha tartib raqamlarini (masalan, 1., 2.), chiziqcha, nuqta, qavslardagi ortiqcha belgilarni tozalab, so'zlarni xatosiz toza holatga keltir.\n"
+            "4. Qat'iy ravishda JSON schema bo'yicha 'words' ro'yxatini qaytar."
+        )
+
+        def _call_gemini():
+            return client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=ExtractedWordsList,
+                ),
+            )
+
+        import asyncio
+        response = await asyncio.to_thread(_call_gemini)
+
+        result_words: List[Tuple[str, str]] = []
+        parsed_obj = None
+        if hasattr(response, "parsed") and response.parsed is not None:
+            parsed_obj = response.parsed
+        elif getattr(response, "text", None):
+            parsed_obj = ExtractedWordsList.model_validate_json(response.text)
+
+        if parsed_obj and parsed_obj.words:
+            for item in parsed_obj.words:
+                en = item.english.strip().lower()
+                uz = item.uzbek.strip()
+                if en and uz:
+                    result_words.append((en, uz))
+
+        return result_words
+    except Exception as e:
+        logger.warning(f"AI file sanitization skipped/failed: {e}")
+        return []
+
+
 def parse_txt_content(content_str: str) -> List[Tuple[str, str]]:
-    """Parses TXT file lines separated by tab, dash, colon or comma."""
+    """Parses TXT file lines separated by tab, dash, colon, arrow, equals, or comma."""
     rows = []
-    delimiters = ["\t", " - ", " – ", " — ", " : ", ":", ","]
+    delimiters = [
+        "\t",
+        " - ",
+        " – ",
+        " — ",
+        " : ",
+        " = ",
+        " -> ",
+        " => ",
+        " | ",
+        ":",
+        "=",
+        ",",
+    ]
     for line in content_str.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -52,6 +136,15 @@ def parse_txt_content(content_str: str) -> List[Tuple[str, str]]:
                     rows.append((en, uz))
                     found = True
                     break
+        if not found:
+            # Check pattern like "apple (olma)"
+            m = re.match(r"^(?:\d+[\.\)]|[-*•])?\s*([a-zA-Z\s\'-]+)\s*\(([^)]+)\)$", line)
+            if m:
+                en = m.group(1).strip().lower()
+                uz = m.group(2).strip().lower()
+                if en and uz:
+                    rows.append((en, uz))
+                    found = True
         if not found and " " in line:
             # Fallback: split on first double space or tab
             parts = re.split(r"\s{2,}", line, maxsplit=1)
@@ -169,19 +262,55 @@ async def extract_rows_from_file(
     file_bytes: bytes,
     custom_en_col: Optional[str] = None,
     custom_uz_col: Optional[str] = None,
+    use_ai: bool = True,
 ) -> Tuple[List[Tuple[str, str]], str, Optional[str], Optional[str]]:
-    """Extracts raw English/Uzbek pairs from TXT, CSV, or XLSX bytes."""
+    """Extracts raw English/Uzbek pairs from TXT, CSV, or XLSX bytes, with AI fallback for arbitrary formats."""
     ext = file_name.split(".")[-1].lower() if "." in file_name else "txt"
+    rows: List[Tuple[str, str]] = []
+
     if ext == "txt":
         content_str = file_bytes.decode("utf-8", errors="replace")
         rows = parse_txt_content(content_str)
+
+        # If standard parser got 0 rows or file has unconventional structure, use AI smart sanitizer
+        if (len(rows) == 0 or (use_ai and any(len(line) > 0 and "-" not in line and ":" not in line for line in content_str.splitlines() if line.strip()))) and settings.GEMINI_API_KEY:
+            ai_rows = await ai_clean_and_extract_words(content_str)
+            if ai_rows:
+                return ai_rows, "txt", "English", "Uzbek"
+
         return rows, "txt", "English", "Uzbek"
+
     elif ext == "csv":
         content_str = file_bytes.decode("utf-8", errors="replace")
         rows, en_col, uz_col = parse_csv_content(content_str, custom_en_col, custom_uz_col)
+
+        if len(rows) == 0 and use_ai and settings.GEMINI_API_KEY:
+            ai_rows = await ai_clean_and_extract_words(content_str)
+            if ai_rows:
+                return ai_rows, "csv", "English", "Uzbek"
+
         return rows, "csv", en_col, uz_col
+
     elif ext in ("xlsx", "xls"):
         rows, en_col, uz_col = parse_xlsx_content(file_bytes, custom_en_col, custom_uz_col)
+
+        if len(rows) == 0 and use_ai and settings.GEMINI_API_KEY:
+            # Fallback text representation from xlsx
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                sheet = wb.active
+                lines = []
+                if sheet:
+                    for r in sheet.iter_rows(values_only=True):
+                        lines.append(" - ".join([str(c) for c in r if c is not None]))
+                raw_sheet_text = "\n".join(lines)
+                ai_rows = await ai_clean_and_extract_words(raw_sheet_text)
+                if ai_rows:
+                    return ai_rows, "xlsx", "English", "Uzbek"
+            except Exception:
+                pass
+
         return rows, "xlsx", en_col, uz_col
     else:
         raise ValueError(f"Qo'llab-quvvatlanmaydigan fayl formati: .{ext}. Faqat TXT, CSV va XLSX mumkin.")
@@ -192,9 +321,10 @@ async def generate_import_preview(
     file_name: str,
     file_bytes: bytes,
     db: AsyncSession,
+    use_ai: bool = True,
 ) -> ImportPreviewResponse:
     """Generates preview analysis before committing import."""
-    rows, file_type, en_col, uz_col = await extract_rows_from_file(file_name, file_bytes)
+    rows, file_type, en_col, uz_col = await extract_rows_from_file(file_name, file_bytes, use_ai=use_ai)
 
     # Get user's existing English words for duplicate checking
     stmt = select(Word.english_word).where(Word.user_id == user_id)
@@ -251,10 +381,11 @@ async def execute_commit_import(
     fill_incomplete_batch: bool = True,
     custom_en_col: Optional[str] = None,
     custom_uz_col: Optional[str] = None,
+    use_ai: bool = True,
 ) -> ImportCommitResponse:
     """Commits imported words into 20-word batches transactionally."""
     rows, file_type, _, _ = await extract_rows_from_file(
-        file_name, file_bytes, custom_en_col, custom_uz_col
+        file_name, file_bytes, custom_en_col, custom_uz_col, use_ai=use_ai
     )
 
     # Get user's existing English words

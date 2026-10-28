@@ -83,10 +83,10 @@ async def process_word_review(
     progress.repetition_number = new_rep
     progress.ease_factor = new_ef
     progress.interval_days = new_interval
-    progress.due_date = now + timedelta(days=new_interval)
     progress.last_reviewed_at = now
     progress.times_reviewed += 1
     if is_correct:
+        progress.due_date = now + timedelta(days=new_interval)
         progress.times_correct += 1
         # 3 consecutive correct answers (repetition_number >= 3) -> Mastered!
         if progress.repetition_number >= 3:
@@ -96,6 +96,8 @@ async def process_word_review(
             progress.is_mastered = False
             # Word stays in learning/weak state until 3 consecutive correct repetitions
     else:
+        # Mistake: set due_date to now (immediate re-review required) and mark as weak!
+        progress.due_date = now
         progress.times_incorrect += 1
         progress.is_mastered = False
         progress.is_weak = True

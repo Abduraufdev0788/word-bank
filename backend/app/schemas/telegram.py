@@ -92,5 +92,7 @@ class TelegramQuizAnswerOut(BaseModel):
     explanation: str
     repetition_number: int = 0
     streak_days: int = 1
+    was_marked_weak: bool = False
+    is_synonym_match: bool = False
 
 

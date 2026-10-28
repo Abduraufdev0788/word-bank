@@ -165,18 +165,19 @@ class BackendAPIClient:
     async def get_word_of_the_day(self, telegram_user_id: int) -> Optional[Dict[str, Any]]:
         return await self._request("GET", f"/telegram/word-of-the-day/{telegram_user_id}")
 
-    # --- Interactive Quizzes ---
+    # --- Interactive Quizzes & 50-Word Booster ---
 
     async def get_quiz_questions(
         self,
         telegram_user_id: int,
-        count: int = 5,
+        count: int = 50,
         direction: str = "en_to_uz",
+        quiz_type: str = "mastered_50",
     ) -> List[Dict[str, Any]]:
         res = await self._request(
             "GET",
             f"/telegram/quiz/{telegram_user_id}",
-            params={"count": count, "direction": direction},
+            params={"count": count, "direction": direction, "quiz_type": quiz_type},
         )
         return res if isinstance(res, list) else []
 
@@ -193,6 +194,27 @@ class BackendAPIClient:
             "direction": direction,
         }
         return await self._request("POST", f"/telegram/quiz/answer/{telegram_user_id}", json=payload)
+
+    # --- File Import (TXT, CSV, XLSX) ---
+
+    async def upload_import_file(
+        self,
+        telegram_user_id: int,
+        file_bytes: bytes,
+        filename: str,
+    ) -> Dict[str, Any]:
+        url = f"{self.base_url}/telegram/import-file/{telegram_user_id}"
+        files = {"file": (filename, file_bytes, "application/octet-stream")}
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                res = await client.post(url, files=files)
+                if res.status_code in [200, 201]:
+                    return {"success": True, "data": res.json()}
+                detail = res.json().get("detail", "Faylni yuklashda xatolik yuz berdi.")
+                return {"success": False, "error": detail}
+        except Exception as e:
+            logger.error(f"Error in upload_import_file: {e}")
+            return {"success": False, "error": f"Server bilan ulanishda xatolik: {e}"}
 
     # --- Mini Stories & Batch Words ---
 

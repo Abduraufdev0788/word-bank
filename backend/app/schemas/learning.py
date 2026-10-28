@@ -39,10 +39,11 @@ class DueWordReviewOut(BaseModel):
     is_weak: bool
 
 
-# --- Quizzes (Anti-Cheat) ---
 class QuizStartRequest(BaseModel):
-    quiz_type: str = Field(default="batch", description="'batch', 'weak_words', 'mixed'")
+    quiz_type: str = Field(default="batch", description="'batch', 'weak_words', 'mastered_50', 'all_50', 'mixed'")
     batch_id: Optional[uuid.UUID] = None
+    question_count: int = Field(default=20, ge=2, le=50)
+    direction: str = Field(default="en_to_uz", description="'en_to_uz' or 'uz_to_en'")
 
 
 class QuizQuestionClientOut(BaseModel):
@@ -50,6 +51,8 @@ class QuizQuestionClientOut(BaseModel):
     word_id: uuid.UUID
     english_word: str
     question_text: str
+    prompt_text: Optional[str] = None
+    direction: str = "en_to_uz"
     options: List[str]  # Never contains answer key or correct_answer
 
 
@@ -70,6 +73,9 @@ class QuizAnswerResponse(BaseModel):
     is_correct: bool
     selected_option: str
     correct_answer: str
+    was_marked_weak: bool = False
+    is_synonym_match: bool = False
+    synonym_note: Optional[str] = None
 
 
 class QuizSummaryOut(BaseModel):

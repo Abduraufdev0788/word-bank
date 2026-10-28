@@ -12,23 +12,47 @@ def main_menu_keyboard(is_linked: bool = True) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔄 Kunlik Takrorlash (SRS)", callback_data="cmd_review"),
-            InlineKeyboardButton("🎯 Viktorina (Quiz)", callback_data="cmd_quiz"),
+            InlineKeyboardButton("🎯 50 talik Test / Viktorina", callback_data="cmd_quiz_modes"),
         ],
         [
             InlineKeyboardButton("➕ Yangi so'z", callback_data="cmd_add"),
-            InlineKeyboardButton("📦 To'plamlarim (20)", callback_data="cmd_batches"),
+            InlineKeyboardButton("📁 Fayl yuklash (TXT/CSV)", callback_data="cmd_import_file"),
         ],
         [
+            InlineKeyboardButton("📦 To'plamlarim (20 talik)", callback_data="cmd_batches"),
             InlineKeyboardButton("⚠️ Zaif So'zlar", callback_data="cmd_weak"),
+        ],
+        [
             InlineKeyboardButton("📖 Mini Hikoyalar", callback_data="cmd_stories"),
-        ],
-        [
             InlineKeyboardButton("🌟 Kun so'zi", callback_data="cmd_word_of_day"),
-            InlineKeyboardButton("📊 Natijalarim", callback_data="cmd_progress"),
         ],
         [
+            InlineKeyboardButton("📊 Natijalarim", callback_data="cmd_progress"),
             InlineKeyboardButton("⚙️ Sozlamalar", callback_data="cmd_settings"),
+        ],
+        [
             InlineKeyboardButton("🌐 Veb-sayt manzili", callback_data="cmd_website"),
+        ],
+    ])
+
+
+def quiz_mode_selection_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🎯 Bilgan so'zlar: 🇺🇿 O'zbekcha ➔ 🇬🇧 Inglizcha (50 ta)", callback_data="start_quiz_mastered_50_uz_to_en"),
+        ],
+        [
+            InlineKeyboardButton("🎯 Bilgan so'zlar: 🇬🇧 Inglizcha ➔ 🇺🇿 O'zbekcha (50 ta)", callback_data="start_quiz_mastered_50"),
+        ],
+        [
+            InlineKeyboardButton("📚 Barcha so'zlar (50 talik test)", callback_data="start_quiz_all_50"),
+        ],
+        [
+            InlineKeyboardButton("⚠️ Zaif so'zlar testi", callback_data="start_quiz_weak"),
+            InlineKeyboardButton("⚡️ Tezkor test (10 ta)", callback_data="start_quiz_fast"),
+        ],
+        [
+            InlineKeyboardButton("🏠 Bosh menyu", callback_data="cmd_menu"),
         ],
     ])
 

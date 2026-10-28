@@ -43,6 +43,8 @@ async def start_quiz(
             db=db,
             quiz_type=quiz_in.quiz_type,
             batch_id=quiz_in.batch_id,
+            question_count=quiz_in.question_count,
+            direction=quiz_in.direction,
         )
         return QuizStartResponse(
             attempt_id=attempt.id,

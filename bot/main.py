@@ -14,7 +14,8 @@ from telegram.ext import (
 from bot.config import bot_settings
 from bot.handlers.start import start_command, help_command, website_info_handler
 from bot.handlers.review import start_review, handle_reveal_card, handle_rate_card
-from bot.handlers.quiz import start_quiz, handle_quiz_answer
+from bot.handlers.quiz import show_quiz_modes, start_quiz_flow, handle_quiz_answer
+from bot.handlers.document_import import handle_document_upload, file_import_help_command
 from bot.handlers.weak import weak_words_command
 from bot.handlers.story import stories_command, handle_read_story
 from bot.handlers.word_of_day import word_of_day_command, handle_add_word_callback
@@ -52,7 +53,8 @@ async def post_init(application: Application) -> None:
     commands = [
         BotCommand("start", "Botni ishga tushirish / Hisobni ulash"),
         BotCommand("review", "Kunlik so'z takrorlash (SRS SM-2)"),
-        BotCommand("quiz", "Interaktiv 4 talik viktorina"),
+        BotCommand("quiz", "50 talik Test & Viktorina Markazi"),
+        BotCommand("import", "Lug'at faylini yuklash (TXT, CSV, XLSX)"),
         BotCommand("add", "Yangi so'z qo'shish (masalan: /add resilient)"),
         BotCommand("weak", "Zaif so'zlarni mustahkamlash"),
         BotCommand("stories", "AI Mini hikoyalarni o'qish"),
@@ -111,7 +113,8 @@ def build_bot_application() -> Application:
     app.add_handler(CommandHandler("link", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("review", start_review))
-    app.add_handler(CommandHandler("quiz", start_quiz))
+    app.add_handler(CommandHandler("quiz", show_quiz_modes))
+    app.add_handler(CommandHandler("import", file_import_help_command))
     app.add_handler(CommandHandler("add", add_word_command))
     app.add_handler(CommandHandler("weak", weak_words_command))
     app.add_handler(CommandHandler("stories", stories_command))
@@ -125,7 +128,9 @@ def build_bot_application() -> Application:
 
     # Callback queries from inline menus
     app.add_handler(CallbackQueryHandler(start_review, pattern="^cmd_review$"))
-    app.add_handler(CallbackQueryHandler(start_quiz, pattern="^cmd_quiz$"))
+    app.add_handler(CallbackQueryHandler(show_quiz_modes, pattern="^cmd_quiz_modes$"))
+    app.add_handler(CallbackQueryHandler(show_quiz_modes, pattern="^cmd_quiz$"))
+    app.add_handler(CallbackQueryHandler(file_import_help_command, pattern="^cmd_import_file$"))
     app.add_handler(CallbackQueryHandler(menu_add_callback, pattern="^cmd_add$"))
     app.add_handler(CallbackQueryHandler(batches_command, pattern="^cmd_batches$"))
     app.add_handler(CallbackQueryHandler(weak_words_command, pattern="^cmd_weak$"))
@@ -136,6 +141,38 @@ def build_bot_application() -> Application:
     app.add_handler(CallbackQueryHandler(main_menu_callback, pattern="^cmd_menu$"))
     app.add_handler(CallbackQueryHandler(help_command, pattern="^help_link$"))
     app.add_handler(CallbackQueryHandler(website_info_handler, pattern="^cmd_website$"))
+
+    # Quiz mode trigger callbacks
+    app.add_handler(
+        CallbackQueryHandler(
+            lambda u, c: start_quiz_flow(u, c, "mastered_50", 50, "uz_to_en"),
+            pattern="^start_quiz_mastered_50_uz_to_en$",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            lambda u, c: start_quiz_flow(u, c, "mastered_50", 50, "en_to_uz"),
+            pattern="^start_quiz_mastered_50$",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            lambda u, c: start_quiz_flow(u, c, "all_50", 50),
+            pattern="^start_quiz_all_50$",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            lambda u, c: start_quiz_flow(u, c, "weak", 15),
+            pattern="^start_quiz_weak$",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            lambda u, c: start_quiz_flow(u, c, "all", 10),
+            pattern="^start_quiz_fast$",
+        )
+    )
 
     # Flashcard review callbacks
     app.add_handler(CallbackQueryHandler(handle_reveal_card, pattern="^reveal_"))
@@ -156,6 +193,9 @@ def build_bot_application() -> Application:
     # Unlink account callbacks
     app.add_handler(CallbackQueryHandler(handle_confirm_unlink, pattern="^confirm_unlink$"))
     app.add_handler(CallbackQueryHandler(handle_cancel_unlink, pattern="^cancel_unlink$"))
+
+    # Document / File Upload Handler (TXT, CSV, XLSX)
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document_upload))
 
     # Smart Text Message Handler (auto-translate & 1-click word add)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text_message))
